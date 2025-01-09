@@ -1,1 +1,1 @@
-FROM 221489699002.dkr.ecr.eu-central-1.amazonaws.com/docker-hub/codiumai/pr-agent:github_action
+FROM codiumai/pr-agent:github_action
