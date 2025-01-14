@@ -24,3 +24,4 @@ runs:
         -v "/var/run/docker.sock":"/var/run/docker.sock" \
         -v "/home/runner/_work":"/home/runner/_work" \
         -v "/opt/actions-runner/_work":"/opt/actions-runner/_work" \
+        $IMAGE
