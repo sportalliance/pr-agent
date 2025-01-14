@@ -4,5 +4,23 @@ branding:
   icon: 'award'
   color: 'green'
 runs:
-  using: 'docker'
-  image: 'Dockerfile.github_action_dockerhub'
+  using: 'composite'
+  steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::221489699002:role/github-actions-ecr-reader
+        aws-region: eu-central-1
+    - name: Login to ECR
+      uses: aws-actions/amazon-ecr-login@v2
+    - name: PR Agent action step
+      shell: bash
+      env:
+        IMAGE: "221489699002.dkr.ecr.eu-central-1.amazonaws.com/docker-hub/codiumai/pr-agent:github_action"
+      run: |
+        docker run --rm \
+        --env-file <(env | grep -E 'HOME|GITHUB_|RUNNER_|ACTIONS_|config.|pr_|github|OPENAI_KEY') \
+        --workdir $PWD \
+        -v "/var/run/docker.sock":"/var/run/docker.sock" \
+        -v "/home/runner/_work":"/home/runner/_work" \
+        $IMAGE
