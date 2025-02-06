@@ -39,53 +39,12 @@ pr_commands = [
 ]
 
 [pr_reviewer]
-num_code_suggestions = ...
+extra_instructions = "..."
 ...
 ```
 
 - The `pr_commands` lists commands that will be executed automatically when a PR is opened.
 - The `[pr_reviewer]` section contains the configurations for the `review` tool you want to edit (if any).
-
-[//]: # ()
-[//]: # (### Incremental Mode)
-
-[//]: # (Incremental review only considers changes since the last Qodo Merge review. This can be useful when working on the PR in an iterative manner, and you want to focus on the changes since the last review instead of reviewing the entire PR again.)
-
-[//]: # (For invoking the incremental mode, the following command can be used:)
-
-[//]: # (```)
-
-[//]: # (/review -i)
-
-[//]: # (```)
-
-[//]: # (Note that the incremental mode is only available for GitHub.)
-
-[//]: # ()
-[//]: # (![incremental review]&#40;https://codium.ai/images/pr_agent/incremental_review_2.png&#41;{width=512})
-
-[//]: # (### PR Reflection)
-
-[//]: # ()
-[//]: # (By invoking:)
-
-[//]: # (```)
-
-[//]: # (/reflect_and_review)
-
-[//]: # (```)
-
-[//]: # (The tool will first ask the author questions about the PR, and will guide the review based on their answers.)
-
-[//]: # ()
-[//]: # (![reflection questions]&#40;https://codium.ai/images/pr_agent/reflection_questions.png&#41;{width=512})
-
-[//]: # ()
-[//]: # (![reflection answers]&#40;https://codium.ai/images/pr_agent/reflection_answers.png&#41;{width=512})
-
-[//]: # ()
-[//]: # (![reflection insights]&#40;https://codium.ai/images/pr_agent/reflection_insights.png&#41;{width=512})
-
 
 
 ## Configuration options
@@ -94,16 +53,12 @@ num_code_suggestions = ...
 
 <table>
   <tr>
-    <td><b>num_code_suggestions</b></td>
-    <td>Number of code suggestions provided by the 'review' tool. Default is 0, meaning no code suggestions will be provided by the `review` tool.</td>
-  </tr>
-  <tr>
-    <td><b>inline_code_comments</b></td>
-    <td>If set to true, the tool will publish the code suggestions as comments on the code diff. Default is false. Note that you need to set `num_code_suggestions`>0 to get code suggestions </td>
-  </tr>
-  <tr>
     <td><b>persistent_comment</b></td>
     <td>If set to true, the review comment will be persistent, meaning that every new review request will edit the previous one. Default is true.</td>
+  </tr>
+  <tr>
+  <td><b>final_update_message</b></td>
+  <td>When set to true, updating a persistent review comment during online commenting will automatically add a short comment with a link to the updated review in the pull request .Default is true.</td>
   </tr>
   <tr>
     <td><b>extra_instructions</b></td>
@@ -168,10 +123,6 @@ If enabled, the `review` tool can approve a PR when a specific comment, `/review
     <td><b>enable_auto_approval</b></td>
     <td>If set to true, the tool will approve the PR when invoked with the 'auto_approve' command. Default is false. This flag can be changed only from a configuration file.</td>
   </tr>
-  <tr>
-    <td><b>maximal_review_effort</b></td>
-    <td>Maximal effort level for auto-approval. If the PR's estimated review effort is above this threshold, the auto-approval will not run. Default is 5.</td>
-  </tr>
 </table>
 
 ## Usage Tips
@@ -189,9 +140,9 @@ If enabled, the `review` tool can approve a PR when a specific comment, `/review
 !!! tip "Automation"
     When you first install Qodo Merge app, the [default mode](../usage-guide/automations_and_usage.md#github-app-automatic-tools-when-a-new-pr-is-opened) for the `review` tool is:
     ```
-    pr_commands = ["/review --pr_reviewer.num_code_suggestions=0", ...]
+    pr_commands = ["/review", ...]
     ```
-    Meaning the `review` tool will run automatically on every PR, without providing code suggestions.
+    Meaning the `review` tool will run automatically on every PR, without any additional configurations.
     Edit this field to enable/disable the tool, or to change the configurations used.
 
 !!! tip "Possible labels from the review tool"
@@ -243,18 +194,8 @@ If enabled, the `review` tool can approve a PR when a specific comment, `/review
     Qodo Merge will automatically approve the PR, and add a comment with the approval.
 
 
-    You can also enable auto-approval only if the PR meets certain requirements, such as that the `estimated_review_effort` label is equal or below a certain threshold, by adjusting the flag:
-    ```
-    [pr_reviewer]
-    maximal_review_effort = 5
-    ```
+!!! tip  "Code suggestions"
 
-[//]: # (!!! tip  "Code suggestions")
+    The `review` tool previously included a legacy feature for providing code suggestions (controlled by `--pr_reviewer.num_code_suggestion`). This functionality has been deprecated and replaced by the [`improve`](./improve.md) tool, which offers higher quality and more actionable code suggestions.
 
-[//]: # ()
-[//]: # (    If you set `num_code_suggestions`>0 , the `review` tool will also provide code suggestions.)
-
-[//]: # (    )
-[//]: # (    Notice If you are interested **only** in the code suggestions, it is recommended to use the [`improve`]&#40;./improve.md&#41; feature instead, since it is a dedicated only to code suggestions, and usually gives better results.)
-
-[//]: # (    Use the `review` tool if you want to get more comprehensive feedback, which includes code suggestions as well.)
+    

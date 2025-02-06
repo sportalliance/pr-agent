@@ -1,8 +1,8 @@
 [config]
 # models
-model="gpt-4-turbo-2024-04-09"
-model_turbo="gpt-4o-2024-11-20"
+model="gpt-4o-2024-11-20"
 fallback_models=["gpt-4o-2024-08-06"]
+#model_weak="gpt-4o-mini-2024-07-18" # optional, a weaker model to use for some easier tasks
 # CLI
 git_provider="github"
 publish_output=true
@@ -14,6 +14,7 @@ use_extra_bad_extensions=false
 use_wiki_settings_file=true
 use_repo_settings_file=true
 use_global_settings_file=true
+disable_auto_feedback = false
 ai_timeout=120 # 2minutes
 skip_keys = []
 # token limits
@@ -33,6 +34,7 @@ ai_disclaimer_title=""  # Pro feature, title for a collapsible disclaimer to AI 
 ai_disclaimer=""  # Pro feature, full text for the AI disclaimer
 output_relevant_configurations=false
 large_patch_policy = "clip" # "clip", "skip"
+duplicate_prompt_examples = false
 # seed
 seed=-1 # set positive value to fix the seed (and ensure temperature=0)
 temperature=0.2
@@ -41,6 +43,7 @@ ignore_pr_title = ["^\\[Auto\\]", "^Auto"] # a list of regular expressions to ma
 ignore_pr_target_branches = [] # a list of regular expressions of target branches to ignore from PR agent when an PR is created
 ignore_pr_source_branches = [] # a list of regular expressions of source branches to ignore from PR agent when an PR is created
 ignore_pr_labels = [] # labels to ignore from PR agent when an PR is created
+ignore_pr_authors = [] # authors to ignore from PR agent when an PR is created
 #
 is_auto_command = false # will be auto-set to true if the command is triggered by an automation
 enable_ai_metadata = false # will enable adding ai metadata
@@ -54,10 +57,6 @@ require_can_be_split_review=false
 require_security_review=true
 require_ticket_analysis_review=true
 # general options
-num_code_suggestions=0
-inline_code_comments = false
-ask_and_reflect=false
-#automatic_review=true
 persistent_comment=true
 extra_instructions = ""
 final_update_message = true
@@ -72,7 +71,6 @@ enable_intro_text=true
 enable_help_text=false # Determines whether to include help text in the PR review. Enabled by default.
 # auto approval
 enable_auto_approval=false
-maximal_review_effort=5
 
 
 [pr_description] # /describe #
@@ -91,6 +89,7 @@ publish_description_as_comment_persistent=true
 ## changes walkthrough section
 enable_semantic_files_types=true
 collapsible_file_list='adaptive' # true, false, 'adaptive'
+collapsible_file_list_threshold=8
 inline_file_summary=false # false, true, 'table'
 # markers
 use_description_markers=false
@@ -99,7 +98,6 @@ include_generated_by_header=true
 enable_large_pr_handling=true
 max_ai_calls=4
 async_ai_calls=true
-mention_extra_files=true
 #custom_labels = ['Bug fix', 'Tests', 'Bug fix with tests', 'Enhancement', 'Documentation', 'Other']
 
 [pr_questions] # /ask #
@@ -114,7 +112,6 @@ dual_publishing_score_threshold=-1 # -1 to disable, [0-10] to set the threshold 
 focus_only_on_problems=true
 #
 extra_instructions = ""
-rank_suggestions = false
 enable_help_text=false
 enable_chat_text=false
 enable_intro_text=true
@@ -124,12 +121,15 @@ max_history_len=4
 apply_suggestions_checkbox=true
 # suggestions scoring
 suggestions_score_threshold=0 # [0-10]| recommend not to set this value above 8, since above it may clip highly relevant suggestions
+new_score_mechanism=true
+new_score_mechanism_th_high=9
+new_score_mechanism_th_medium=7
 # params for '/improve --extended' mode
 auto_extended_mode=true
 num_code_suggestions_per_chunk=4
 max_number_of_calls = 3
 parallel_calls = true
-rank_extended_suggestions = false
+
 final_clip_factor = 0.8
 # self-review checkbox
 demand_code_suggestions_self_review=false # add a checkbox for the author to self-review the code suggestions
@@ -139,6 +139,7 @@ fold_suggestions_on_self_review=true # Pro feature. if true, the code suggestion
 # Suggestion impact 💎
 publish_post_process_suggestion_impact=true
 wiki_page_accepted_suggestions=true
+allow_thumbs_up_down=false
 
 [pr_custom_prompt] # /custom_prompt #
 prompt = """\
@@ -162,6 +163,7 @@ class_name = ""        # in case there are several methods with the same name in
 [pr_update_changelog] # /update_changelog #
 push_changelog_changes=false
 extra_instructions = ""
+add_pr_link=true
 
 [pr_analyze] # /analyze #
 enable_help_text=true
@@ -218,7 +220,7 @@ override_deployment_type = true
 handle_pr_actions = ['opened', 'reopened', 'ready_for_review']
 pr_commands = [
     "/describe --pr_description.final_update_message=false",
-    "/review --pr_reviewer.num_code_suggestions=0",
+    "/review",
     "/improve",
 ]
 # settings for "pull_request" event with "synchronize" action - used to detect and handle push triggers for new commits
@@ -230,27 +232,27 @@ push_trigger_pending_tasks_backlog = true
 push_trigger_pending_tasks_ttl = 300
 push_commands = [
     "/describe",
-    "/review --pr_reviewer.num_code_suggestions=0",
+    "/review",
 ]
 
 [gitlab]
 url = "https://gitlab.com"
 pr_commands = [
     "/describe --pr_description.final_update_message=false",
-    "/review --pr_reviewer.num_code_suggestions=0",
+    "/review",
     "/improve",
 ]
 handle_push_trigger = false
 push_commands = [
     "/describe",
-    "/review --pr_reviewer.num_code_suggestions=0",
+    "/review",
 ]
 
 [bitbucket_app]
 pr_commands = [
     "/describe --pr_description.final_update_message=false",
-    "/review --pr_reviewer.num_code_suggestions=0",
-    "/improve --pr_code_suggestions.commitable_code_suggestions=true --pr_code_suggestions.suggestions_score_threshold=7",
+    "/review",
+    "/improve --pr_code_suggestions.commitable_code_suggestions=true",
 ]
 avoid_full_files = false
 
@@ -275,8 +277,8 @@ avoid_full_files = false
 url = ""
 pr_commands = [
     "/describe --pr_description.final_update_message=false",
-    "/review --pr_reviewer.num_code_suggestions=0",
-    "/improve --pr_code_suggestions.commitable_code_suggestions=true --pr_code_suggestions.suggestions_score_threshold=7",
+    "/review",
+    "/improve --pr_code_suggestions.commitable_code_suggestions=true",
 ]
 
 [litellm]
@@ -308,7 +310,16 @@ number_of_results = 5
 
 [lancedb]
 uri = "./lancedb"
+
 [best_practices]
 content = ""
+organization_name = ""
 max_lines_allowed = 800
 enable_global_best_practices = false
+
+[auto_best_practices]
+enable_auto_best_practices = true # public - general flag to disable all auto best practices usage
+utilize_auto_best_practices = true # public - disable usage of auto best practices in the 'improve' tool
+extra_instructions = "" # public - extra instructions to the auto best practices generation prompt
+content = ""
+max_patterns = 5 # max number of patterns to be detected

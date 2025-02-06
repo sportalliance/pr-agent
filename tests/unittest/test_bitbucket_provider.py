@@ -24,6 +24,13 @@ class TestBitbucketServerProvider:
         assert repo_slug == "my-repo"
         assert pr_number == 1
 
+    def test_parse_pr_url_with_users(self):
+        url = "https://bitbucket.company-server.url/users/username/repos/my-repo/pull-requests/1"
+        workspace_slug, repo_slug, pr_number = BitbucketServerProvider._parse_pr_url(url)
+        assert workspace_slug == "~username"
+        assert repo_slug == "my-repo"
+        assert pr_number == 1
+
     def mock_get_content_of_file(self, project_key, repository_slug, filename, at=None, markup=None):
         content_map = {
             '9c1cffdd9f276074bfb6fb3b70fbee62d298b058': 'file\nwith\nsome\nlines\nto\nemulate\na\nreal\nfile\n',
@@ -244,7 +251,7 @@ class TestBitbucketServerProvider:
             FilePatchInfo(
                 'file\nwith\nmultiple\nlines\nto\nemulate\na\nreal\nfile',
                 'readme\nwithout\nsome\nlines\nto\nsimulate\na\nreal\nfile',
-                '--- \n+++ \n@@ -1,9 +1,9 @@\n-file\n-with\n-multiple\n+readme\n+without\n+some\n lines\n to\n-emulate\n+simulate\n a\n real\n file',
+                '--- \n+++ \n@@ -1,9 +1,9 @@\n-file\n-with\n-multiple\n+readme\n+without\n+some\n lines\n to\n-emulate\n+simulate\n a\n real\n file\n',
                 'Readme.md',
                 edit_type=EDIT_TYPE.MODIFIED,
             )
@@ -266,7 +273,7 @@ class TestBitbucketServerProvider:
             FilePatchInfo(
                 'file\nwith\nsome\nlines\nto\nemulate\na\nreal\nfile',
                 'readme\nwithout\nsome\nlines\nto\nsimulate\na\nreal\nfile',
-                '--- \n+++ \n@@ -1,9 +1,9 @@\n-file\n-with\n+readme\n+without\n some\n lines\n to\n-emulate\n+simulate\n a\n real\n file',
+                '--- \n+++ \n@@ -1,9 +1,9 @@\n-file\n-with\n+readme\n+without\n some\n lines\n to\n-emulate\n+simulate\n a\n real\n file\n',
                 'Readme.md',
                 edit_type=EDIT_TYPE.MODIFIED,
             )
@@ -288,7 +295,7 @@ class TestBitbucketServerProvider:
             FilePatchInfo(
                 'file\nwith\nsome\nlines\nto\nemulate\na\nreal\nfile',
                 'readme\nwithout\nsome\nlines\nto\nsimulate\na\nreal\nfile',
-                '--- \n+++ \n@@ -1,9 +1,9 @@\n-file\n-with\n+readme\n+without\n some\n lines\n to\n-emulate\n+simulate\n a\n real\n file',
+                '--- \n+++ \n@@ -1,9 +1,9 @@\n-file\n-with\n+readme\n+without\n some\n lines\n to\n-emulate\n+simulate\n a\n real\n file\n',
                 'Readme.md',
                 edit_type=EDIT_TYPE.MODIFIED,
             )

@@ -7,11 +7,13 @@ import html
 import json
 import os
 import re
+import sys
 import textwrap
 import time
 import traceback
 from datetime import datetime
 from enum import Enum
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, List, Tuple
 
 import html2text
@@ -21,10 +23,17 @@ from pydantic import BaseModel
 from starlette_context import context
 
 from pr_agent.algo import MAX_TOKENS
+from pr_agent.algo.git_patch_processing import extract_hunk_lines_from_patch
 from pr_agent.algo.token_handler import TokenEncoder
 from pr_agent.algo.types import FilePatchInfo
 from pr_agent.config_loader import get_settings, global_settings
 from pr_agent.log import get_logger
+
+
+def get_weak_model() -> str:
+    if get_settings().get("config.model_weak"):
+        return get_settings().config.model_weak
+    return get_settings().config.model
 
 
 class Range(BaseModel):
@@ -35,8 +44,7 @@ class Range(BaseModel):
 
 class ModelType(str, Enum):
     REGULAR = "regular"
-    TURBO = "turbo"
-
+    WEAK = "weak"
 
 class PRReviewHeader(str, Enum):
     REGULAR = "## PR Reviewer Guide"
@@ -97,7 +105,8 @@ def unique_strings(input_list: List[str]) -> List[str]:
 def convert_to_markdown_v2(output_data: dict,
                            gfm_supported: bool = True,
                            incremental_review=None,
-                           git_provider=None) -> str:
+                           git_provider=None,
+                           files=None) -> str:
     """
     Convert a dictionary of data into markdown format.
     Args:
@@ -221,9 +230,13 @@ def convert_to_markdown_v2(output_data: dict,
                             continue
                         relevant_file = issue.get('relevant_file', '').strip()
                         issue_header = issue.get('issue_header', '').strip()
+                        if issue_header.lower() == 'possible bug':
+                            issue_header = 'Possible Issue'  # Make the header less frightening
                         issue_content = issue.get('issue_content', '').strip()
                         start_line = int(str(issue.get('start_line', 0)).strip())
                         end_line = int(str(issue.get('end_line', 0)).strip())
+
+                        relevant_lines_str = extract_relevant_lines_str(end_line, files, relevant_file, start_line, dedent=True)
                         if git_provider:
                             reference_link = git_provider.get_line_link(relevant_file, start_line, end_line)
                         else:
@@ -231,7 +244,10 @@ def convert_to_markdown_v2(output_data: dict,
 
                         if gfm_supported:
                             if reference_link is not None and len(reference_link) > 0:
-                                issue_str = f"<a href='{reference_link}'><strong>{issue_header}</strong></a><br>{issue_content}"
+                                if relevant_lines_str:
+                                    issue_str = f"<details><summary><a href='{reference_link}'><strong>{issue_header}</strong></a>\n\n{issue_content}</summary>\n\n{relevant_lines_str}\n\n</details>"
+                                else:
+                                    issue_str = f"<a href='{reference_link}'><strong>{issue_header}</strong></a><br>{issue_content}"
                             else:
                                 issue_str = f"<strong>{issue_header}</strong><br>{issue_content}"
                         else:
@@ -255,68 +271,143 @@ def convert_to_markdown_v2(output_data: dict,
     if gfm_supported:
         markdown_text += "</table>\n"
 
-    if 'code_feedback' in output_data:
-        if gfm_supported:
-            markdown_text += f"\n\n"
-            markdown_text += f"<details><summary> <strong>Code feedback:</strong></summary>\n\n"
-            markdown_text += "<hr>"
-        else:
-            markdown_text += f"\n\n### Code feedback:\n\n"
-        for i, value in enumerate(output_data['code_feedback']):
-            if value is None or value == '' or value == {} or value == []:
-                continue
-            markdown_text += parse_code_suggestion(value, i, gfm_supported)+"\n\n"
-        if markdown_text.endswith('<hr>'):
-            markdown_text= markdown_text[:-4]
-        if gfm_supported:
-            markdown_text += f"</details>"
-
     return markdown_text
+
+
+def extract_relevant_lines_str(end_line, files, relevant_file, start_line, dedent=False) -> str:
+    """
+    Finds 'relevant_file' in 'files', and extracts the lines from 'start_line' to 'end_line' string from the file content.
+    """
+    try:
+        relevant_lines_str = ""
+        if files:
+            files = set_file_languages(files)
+            for file in files:
+                if file.filename.strip() == relevant_file:
+                    if not file.head_file:
+                        # as a fallback, extract relevant lines directly from patch
+                        patch = file.patch
+                        get_logger().info(f"No content found in file: '{file.filename}' for 'extract_relevant_lines_str'. Using patch instead")
+                        _, selected_lines = extract_hunk_lines_from_patch(patch, file.filename, start_line, end_line,side='right')
+                        if not selected_lines:
+                            get_logger().error(f"Failed to extract relevant lines from patch: {file.filename}")
+                            return ""
+                        # filter out '-' lines
+                        relevant_lines_str = ""
+                        for line in selected_lines.splitlines():
+                            if line.startswith('-'):
+                                continue
+                            relevant_lines_str += line[1:] + '\n'
+                    else:
+                        relevant_file_lines = file.head_file.splitlines()
+                        relevant_lines_str = "\n".join(relevant_file_lines[start_line - 1:end_line])
+
+                    if dedent and relevant_lines_str:
+                        # Remove the longest leading string of spaces and tabs common to all lines.
+                        relevant_lines_str = textwrap.dedent(relevant_lines_str)
+                    relevant_lines_str = f"```{file.language}\n{relevant_lines_str}\n```"
+                    break
+
+        return relevant_lines_str
+    except Exception as e:
+        get_logger().exception(f"Failed to extract relevant lines: {e}")
+        return ""
 
 
 def ticket_markdown_logic(emoji, markdown_text, value, gfm_supported) -> str:
     ticket_compliance_str = ""
-    final_compliance_level = -1
+    compliance_emoji = ''
+    # Track compliance levels across all tickets
+    all_compliance_levels = []
+
     if isinstance(value, list):
-        for v in value:
-            ticket_url = v.get('ticket_url', '').strip()
-            compliance_level = v.get('overall_compliance_level', '').strip()
-            # add emojis, if 'Fully compliant' ✅, 'Partially compliant' 🔶, or 'Not compliant' ❌
-            if compliance_level.lower() == 'fully compliant':
-                # compliance_level = '✅ Fully compliant'
-                final_compliance_level = 2 if final_compliance_level == -1 else 1
-            elif compliance_level.lower() == 'partially compliant':
-                # compliance_level = '🔶 Partially compliant'
-                final_compliance_level = 1
-            elif compliance_level.lower() == 'not compliant':
-                # compliance_level = '❌ Not compliant'
-                final_compliance_level = 0 if final_compliance_level < 1 else 1
+        for ticket_analysis in value:
+            try:
+                ticket_url = ticket_analysis.get('ticket_url', '').strip()
+                explanation = ''
+                ticket_compliance_level = ''  # Individual ticket compliance
+                fully_compliant_str = ticket_analysis.get('fully_compliant_requirements', '').strip()
+                not_compliant_str = ticket_analysis.get('not_compliant_requirements', '').strip()
+                requires_further_human_verification = ticket_analysis.get('requires_further_human_verification',
+                                                                          '').strip()
 
-            # explanation = v.get('compliance_analysis', '').strip()
-            explanation = ''
-            fully_compliant_str = v.get('fully_compliant_requirements', '').strip()
-            not_compliant_str = v.get('not_compliant_requirements', '').strip()
-            if fully_compliant_str:
-                explanation += f"Fully compliant requirements:\n{fully_compliant_str}\n\n"
-            if not_compliant_str:
-                explanation += f"Not compliant requirements:\n{not_compliant_str}\n\n"
+                if not fully_compliant_str and not not_compliant_str:
+                    get_logger().debug(f"Ticket compliance has no requirements",
+                                       artifact={'ticket_url': ticket_url})
+                    continue
 
-            ticket_compliance_str += f"\n\n**[{ticket_url.split('/')[-1]}]({ticket_url}) - {compliance_level}**\n\n{explanation}\n\n"
-        if final_compliance_level == 2:
-            compliance_level = '✅'
-        elif final_compliance_level == 1:
-            compliance_level = '🔶'
-        else:
-            compliance_level = '❌'
+                # Calculate individual ticket compliance level
+                if fully_compliant_str:
+                    if not_compliant_str:
+                        ticket_compliance_level = 'Partially compliant'
+                    else:
+                        if not requires_further_human_verification:
+                            ticket_compliance_level = 'Fully compliant'
+                        else:
+                            ticket_compliance_level = 'PR Code Verified'
+                elif not_compliant_str:
+                    ticket_compliance_level = 'Not compliant'
 
+                # Store the compliance level for aggregation
+                if ticket_compliance_level:
+                    all_compliance_levels.append(ticket_compliance_level)
+
+                # build compliance string
+                if fully_compliant_str:
+                    explanation += f"Compliant requirements:\n\n{fully_compliant_str}\n\n"
+                if not_compliant_str:
+                    explanation += f"Non-compliant requirements:\n\n{not_compliant_str}\n\n"
+                if requires_further_human_verification:
+                    explanation += f"Requires further human verification:\n\n{requires_further_human_verification}\n\n"
+                ticket_compliance_str += f"\n\n**[{ticket_url.split('/')[-1]}]({ticket_url}) - {ticket_compliance_level}**\n\n{explanation}\n\n"
+
+                # for debugging
+                if requires_further_human_verification:
+                    get_logger().debug(f"Ticket compliance requires further human verification",
+                                       artifact={'ticket_url': ticket_url,
+                                                 'requires_further_human_verification': requires_further_human_verification,
+                                                 'compliance_level': ticket_compliance_level})
+
+            except Exception as e:
+                get_logger().exception(f"Failed to process ticket compliance: {e}")
+                continue
+
+        # Calculate overall compliance level and emoji
+        if all_compliance_levels:
+            if all(level == 'Fully compliant' for level in all_compliance_levels):
+                compliance_level = 'Fully compliant'
+                compliance_emoji = '✅'
+            elif all(level == 'PR Code Verified' for level in all_compliance_levels):
+                compliance_level = 'PR Code Verified'
+                compliance_emoji = '✅'
+            elif any(level == 'Not compliant' for level in all_compliance_levels):
+                # If there's a mix of compliant and non-compliant tickets
+                if any(level in ['Fully compliant', 'PR Code Verified'] for level in all_compliance_levels):
+                    compliance_level = 'Partially compliant'
+                    compliance_emoji = '🔶'
+                else:
+                    compliance_level = 'Not compliant'
+                    compliance_emoji = '❌'
+            elif any(level == 'Partially compliant' for level in all_compliance_levels):
+                compliance_level = 'Partially compliant'
+                compliance_emoji = '🔶'
+            else:
+                compliance_level = 'PR Code Verified'
+                compliance_emoji = '✅'
+
+            # Set extra statistics outside the ticket loop
+            get_settings().set('config.extra_statistics', {'compliance_level': compliance_level})
+
+        # editing table row for ticket compliance analysis
         if gfm_supported:
             markdown_text += f"<tr><td>\n\n"
-            markdown_text += f"**{emoji} Ticket compliance analysis {compliance_level}**\n\n"
+            markdown_text += f"**{emoji} Ticket compliance analysis {compliance_emoji}**\n\n"
             markdown_text += ticket_compliance_str
             markdown_text += f"</td></tr>\n"
         else:
-            markdown_text += f"### {emoji} Ticket compliance analysis {compliance_level}\n\n"
-            markdown_text += ticket_compliance_str+"\n\n"
+            markdown_text += f"### {emoji} Ticket compliance analysis {compliance_emoji}\n\n"
+            markdown_text += ticket_compliance_str + "\n\n"
+
     return markdown_text
 
 
@@ -543,27 +634,22 @@ def load_large_diff(filename, new_file_content_str: str, original_file_content_s
     """
     Generate a patch for a modified file by comparing the original content of the file with the new content provided as
     input.
-
-    Args:
-        new_file_content_str: The new content of the file as a string.
-        original_file_content_str: The original content of the file as a string.
-
-    Returns:
-        The generated or provided patch string.
-
-    Raises:
-        None.
     """
-    patch = ""
+    if not original_file_content_str and not new_file_content_str:
+        return ""
+
     try:
+        original_file_content_str = (original_file_content_str or "").rstrip() + "\n"
+        new_file_content_str = (new_file_content_str or "").rstrip() + "\n"
         diff = difflib.unified_diff(original_file_content_str.splitlines(keepends=True),
                                     new_file_content_str.splitlines(keepends=True))
         if get_settings().config.verbosity_level >= 2 and show_warning:
-            get_logger().warning(f"File was modified, but no patch was found. Manually creating patch: {filename}.")
+            get_logger().info(f"File was modified, but no patch was found. Manually creating patch: {filename}.")
         patch = ''.join(diff)
-    except Exception:
-        pass
-    return patch
+        return patch
+    except Exception as e:
+        get_logger().exception(f"Failed to generate patch for file: {filename}")
+        return ""
 
 
 def update_settings_from_args(args: List[str]) -> List[str]:
@@ -649,7 +735,7 @@ def try_fix_yaml(response_text: str,
         get_logger().info(f"Successfully parsed AI prediction after adding |-\n")
         return data
     except:
-        get_logger().info(f"Failed to parse AI prediction after adding |-\n")
+        pass
 
     # second fallback - try to extract only range from first ```yaml to ````
     snippet_pattern = r'```(yaml)?[\s\S]*?```'
@@ -693,9 +779,18 @@ def try_fix_yaml(response_text: str,
         except:
             pass
 
+    # fifth fallback - try to remove leading '+' (sometimes added by AI for 'existing code' and 'improved code')
+    response_text_lines_copy = response_text_lines.copy()
+    for i in range(0, len(response_text_lines_copy)):
+        response_text_lines_copy[i] = ' ' + response_text_lines_copy[i][1:]
+    try:
+        data = yaml.safe_load('\n'.join(response_text_lines_copy))
+        get_logger().info(f"Successfully parsed AI prediction after removing leading '+'")
+        return data
+    except:
+        pass
 
-    # fifth fallback - try to remove last lines
-    data = {}
+    # sixth fallback - try to remove last lines
     for i in range(1, len(response_text_lines)):
         response_text_lines_tmp = '\n'.join(response_text_lines[:-i])
         try:
@@ -1106,3 +1201,48 @@ def process_description(description_full: str) -> Tuple[str, List]:
         get_logger().exception(f"Failed to process description: {e}")
 
     return base_description_str, files
+
+def get_version() -> str:
+    # First check pyproject.toml if running directly out of repository
+    if os.path.exists("pyproject.toml"):
+        if sys.version_info >= (3, 11):
+            import tomllib
+            with open("pyproject.toml", "rb") as f:
+                data = tomllib.load(f)
+                if "project" in data and "version" in data["project"]:
+                    return data["project"]["version"]
+                else:
+                    get_logger().warning("Version not found in pyproject.toml")
+        else:
+            get_logger().warning("Unable to determine local version from pyproject.toml")
+
+    # Otherwise get the installed pip package version
+    try:
+        return version('pr-agent')
+    except PackageNotFoundError:
+        get_logger().warning("Unable to find package named 'pr-agent'")
+        return "unknown"
+
+
+def set_file_languages(diff_files) -> List[FilePatchInfo]:
+    try:
+        # if the language is already set, do not change it
+        if hasattr(diff_files[0], 'language') and diff_files[0].language:
+            return diff_files
+
+        # map file extensions to programming languages
+        language_extension_map_org = get_settings().language_extension_map_org
+        extension_to_language = {}
+        for language, extensions in language_extension_map_org.items():
+            for ext in extensions:
+                extension_to_language[ext] = language
+        for file in diff_files:
+            extension_s = '.' + file.filename.rsplit('.')[-1]
+            language_name = "txt"
+            if extension_s and (extension_s in extension_to_language):
+                language_name = extension_to_language[extension_s]
+            file.language = language_name.lower()
+    except Exception as e:
+        get_logger().exception(f"Failed to set file languages: {e}")
+
+    return diff_files

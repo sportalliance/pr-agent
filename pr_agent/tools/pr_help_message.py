@@ -114,7 +114,7 @@ class PRHelpMessage:
                 self.vars['snippets'] = docs_prompt.strip()
 
                 # run the AI model
-                response = await retry_with_fallback_models(self._prepare_prediction, model_type=ModelType.REGULAR)
+                response = await retry_with_fallback_models(self._prepare_prediction, model_type=ModelType.WEAK)
                 response_yaml = load_yaml(response)
                 response_str = response_yaml.get('response')
                 relevant_sections = response_yaml.get('relevant_sections')
@@ -174,10 +174,11 @@ class PRHelpMessage:
                 tool_names.append(f"[IMPROVE COMPONENT]({base_path}/improve_component/) 💎")
                 tool_names.append(f"[ANALYZE]({base_path}/analyze/) 💎")
                 tool_names.append(f"[ASK]({base_path}/ask/)")
+                tool_names.append(f"[SIMILAR ISSUE]({base_path}/similar_issues/)")
                 tool_names.append(f"[GENERATE CUSTOM LABELS]({base_path}/custom_labels/) 💎")
                 tool_names.append(f"[CI FEEDBACK]({base_path}/ci_feedback/) 💎")
                 tool_names.append(f"[CUSTOM PROMPT]({base_path}/custom_prompt/) 💎")
-                tool_names.append(f"[SIMILAR ISSUE]({base_path}/similar_issues/)")
+                tool_names.append(f"[IMPLEMENT]({base_path}/implement/) 💎")
 
                 descriptions = []
                 descriptions.append("Generates PR description - title, type, summary, code walkthrough and labels")
@@ -189,10 +190,11 @@ class PRHelpMessage:
                 descriptions.append("Code suggestions for a specific component that changed in the PR")
                 descriptions.append("Identifies code components that changed in the PR, and enables to interactively generate tests, docs, and code suggestions for each component")
                 descriptions.append("Answering free-text questions about the PR")
+                descriptions.append("Automatically retrieves and presents similar issues")
                 descriptions.append("Generates custom labels for the PR, based on specific guidelines defined by the user")
                 descriptions.append("Generates feedback and analysis for a failed CI job")
                 descriptions.append("Generates custom suggestions for improving the PR code, derived only from a specific guidelines prompt defined by the user")
-                descriptions.append("Automatically retrieves and presents similar issues")
+                descriptions.append("Generates implementation code from review suggestions")
 
                 commands  =[]
                 commands.append("`/describe`")
@@ -204,10 +206,11 @@ class PRHelpMessage:
                 commands.append("`/improve_component`")
                 commands.append("`/analyze`")
                 commands.append("`/ask`")
+                commands.append("`/similar_issue`")
                 commands.append("`/generate_labels`")
                 commands.append("`/checks`")
                 commands.append("`/custom_prompt`")
-                commands.append("`/similar_issue`")
+                commands.append("`/implement`")
 
                 checkbox_list = []
                 checkbox_list.append(" - [ ] Run <!-- /describe -->")
@@ -226,13 +229,14 @@ class PRHelpMessage:
                 checkbox_list.append("[*]")
                 checkbox_list.append("[*]")
                 checkbox_list.append("[*]")
+                checkbox_list.append("[*]")
 
                 if isinstance(self.git_provider, GithubProvider) and not get_settings().config.get('disable_checkboxes', False):
                     pr_comment += f"<table><tr align='left'><th align='left'>Tool</th><th align='left'>Description</th><th align='left'>Trigger Interactively :gem:</th></tr>"
                     for i in range(len(tool_names)):
                         pr_comment += f"\n<tr><td align='left'>\n\n<strong>{tool_names[i]}</strong></td>\n<td>{descriptions[i]}</td>\n<td>\n\n{checkbox_list[i]}\n</td></tr>"
                     pr_comment += "</table>\n\n"
-                    pr_comment += f"""\n\n(1) Note that each tool be [triggered automatically](https://pr-agent-docs.codium.ai/usage-guide/automations_and_usage/#github-app-automatic-tools-when-a-new-pr-is-opened) when a new PR is opened, or called manually by [commenting on a PR](https://pr-agent-docs.codium.ai/usage-guide/automations_and_usage/#online-usage)."""
+                    pr_comment += f"""\n\n(1) Note that each tool can be [triggered automatically](https://pr-agent-docs.codium.ai/usage-guide/automations_and_usage/#github-app-automatic-tools-when-a-new-pr-is-opened) when a new PR is opened, or called manually by [commenting on a PR](https://pr-agent-docs.codium.ai/usage-guide/automations_and_usage/#online-usage)."""
                     pr_comment += f"""\n\n(2) Tools marked with [*] require additional parameters to be passed. For example, to invoke the `/ask` tool, you need to comment on a PR: `/ask "<question content>"`. See the relevant documentation for each tool for more details."""
                 elif isinstance(self.git_provider, BitbucketServerProvider):
                     # only support basic commands in BBDC
@@ -242,7 +246,7 @@ class PRHelpMessage:
                     for i in range(len(tool_names)):
                         pr_comment += f"\n<tr><td align='left'>\n\n<strong>{tool_names[i]}</strong></td><td>{commands[i]}</td><td>{descriptions[i]}</td></tr>"
                     pr_comment += "</table>\n\n"
-                    pr_comment += f"""\n\nNote that each tool be [invoked automatically](https://pr-agent-docs.codium.ai/usage-guide/automations_and_usage/) when a new PR is opened, or called manually by [commenting on a PR](https://pr-agent-docs.codium.ai/usage-guide/automations_and_usage/#online-usage)."""
+                    pr_comment += f"""\n\nNote that each tool can be [invoked automatically](https://pr-agent-docs.codium.ai/usage-guide/automations_and_usage/) when a new PR is opened, or called manually by [commenting on a PR](https://pr-agent-docs.codium.ai/usage-guide/automations_and_usage/#online-usage)."""
 
                 if get_settings().config.publish_output:
                     self.git_provider.publish_comment(pr_comment)

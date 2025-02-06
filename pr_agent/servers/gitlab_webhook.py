@@ -61,6 +61,9 @@ async def handle_request(api_url: str, body: str, log_context: dict, sender_id: 
 async def _perform_commands_gitlab(commands_conf: str, agent: PRAgent, api_url: str,
                                    log_context: dict, data: dict):
     apply_repo_settings(api_url)
+    if commands_conf == "pr_commands" and get_settings().config.disable_auto_feedback:  # auto commands for PR, and auto feedback is disabled
+        get_logger().info(f"Auto feedback is disabled, skipping auto commands for PR {api_url=}", **log_context)
+        return
     if not should_process_pr_logic(data): # Here we already updated the configurations
         return
     commands = get_settings().get(f"gitlab.{commands_conf}", {})
@@ -97,6 +100,14 @@ def should_process_pr_logic(data) -> bool:
         if not data.get('object_attributes', {}):
             return False
         title = data['object_attributes'].get('title')
+        sender = data.get("user", {}).get("username", "")
+
+        # logic to ignore PRs from specific users
+        ignore_pr_users = get_settings().get("CONFIG.IGNORE_PR_AUTHORS", [])
+        if ignore_pr_users and sender:
+            if sender in ignore_pr_users:
+                get_logger().info(f"Ignoring PR from user '{sender}' due to 'config.ignore_pr_authors' settings")
+                return False
 
         # logic to ignore MRs for titles, labels and source, target branches.
         ignore_mr_title = get_settings().get("CONFIG.IGNORE_PR_TITLE", [])

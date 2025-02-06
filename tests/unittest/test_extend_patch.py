@@ -3,6 +3,7 @@ import pytest
 from pr_agent.algo.git_patch_processing import extend_patch
 from pr_agent.algo.pr_processing import pr_generate_extended_diff
 from pr_agent.algo.token_handler import TokenHandler
+from pr_agent.algo.utils import load_large_diff
 from pr_agent.config_loader import get_settings
 
 
@@ -145,8 +146,8 @@ class TestExtendedPatchMoreLines:
         # Check that with no extra lines, the patches are the same as the original patches
         p0 = patches_extended_no_extra_lines[0].strip()
         p1 = patches_extended_no_extra_lines[1].strip()
-        assert p0 == '## file1\n' + pr_languages[0]['files'][0].patch.strip()
-        assert p1 == '## file2\n' + pr_languages[0]['files'][1].patch.strip()
+        assert p0 == "## File: 'file1'\n" + pr_languages[0]['files'][0].patch.strip()
+        assert p1 == "## File: 'file2'\n" + pr_languages[0]['files'][1].patch.strip()
 
         patches_extended_with_extra_lines, total_tokens, patches_extended_tokens = pr_generate_extended_diff(
             pr_languages, token_handler, add_line_numbers_to_hunks=False,
@@ -154,5 +155,37 @@ class TestExtendedPatchMoreLines:
             patch_extra_lines_after=1
         )
 
+
         p0_extended = patches_extended_with_extra_lines[0].strip()
-        assert p0_extended == '## file1\n\n@@ -3,8 +3,8 @@ \n line0\n line1\n-original content\n+modified content\n line2\n line3\n line4\n line5\n line6'
+        assert p0_extended == "## File: 'file1'\n\n@@ -3,8 +3,8 @@ \n line0\n line1\n-original content\n+modified content\n line2\n line3\n line4\n line5\n line6"
+
+
+class TestLoadLargeDiff:
+    def test_no_newline(self):
+        patch = load_large_diff("test.py",
+                                """\
+                                old content 1
+                                some new content
+                                another line
+                                """,
+                                """
+                                old content 1
+                                old content 2""")
+
+        patch_expected="""\
+--- 
++++ 
+@@ -1,3 +1,3 @@
+-
+                                 old content 1
+-                                old content 2
++                                some new content
++                                another line
+"""
+        assert patch == patch_expected
+
+    def test_empty_inputs(self):
+        assert load_large_diff("test.py", "", "") == ""
+        assert load_large_diff("test.py", None, None) == ""
+        assert (load_large_diff("test.py", "content\n", "") ==
+                '--- \n+++ \n@@ -1 +1 @@\n-\n+content\n')

@@ -257,6 +257,14 @@ def should_process_pr_logic(body) -> bool:
         pr_labels = pull_request.get("labels", [])
         source_branch = pull_request.get("head", {}).get("ref", "")
         target_branch = pull_request.get("base", {}).get("ref", "")
+        sender = body.get("sender", {}).get("login")
+
+        # logic to ignore PRs from specific users
+        ignore_pr_users = get_settings().get("CONFIG.IGNORE_PR_AUTHORS", [])
+        if ignore_pr_users and sender:
+            if sender in ignore_pr_users:
+                get_logger().info(f"Ignoring PR from user '{sender}' due to 'config.ignore_pr_authors' setting")
+                return False
 
         # logic to ignore PRs with specific titles
         if title:
@@ -276,6 +284,7 @@ def should_process_pr_logic(body) -> bool:
                 get_logger().info(f"Ignoring PR with labels '{labels_str}' due to config.ignore_pr_labels settings")
                 return False
 
+        # logic to ignore PRs with specific source or target branches
         ignore_pr_source_branches = get_settings().get("CONFIG.IGNORE_PR_SOURCE_BRANCHES", [])
         ignore_pr_target_branches = get_settings().get("CONFIG.IGNORE_PR_TARGET_BRANCHES", [])
         if pull_request and (ignore_pr_source_branches or ignore_pr_target_branches):
@@ -374,6 +383,9 @@ def _check_pull_request_event(action: str, body: dict, log_context: dict) -> Tup
 async def _perform_auto_commands_github(commands_conf: str, agent: PRAgent, body: dict, api_url: str,
                                         log_context: dict):
     apply_repo_settings(api_url)
+    if commands_conf == "pr_commands" and get_settings().config.disable_auto_feedback:  # auto commands for PR, and auto feedback is disabled
+        get_logger().info(f"Auto feedback is disabled, skipping auto commands for PR {api_url=}")
+        return
     if not should_process_pr_logic(body): # Here we already updated the configuration with the repo settings
         return {}
     commands = get_settings().get(f"github_app.{commands_conf}")

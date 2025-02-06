@@ -84,6 +84,7 @@ async def is_valid_notification(notification, headers, handled_ids, session, use
                     return False, handled_ids
                 async with session.get(latest_comment, headers=headers) as comment_response:
                     check_prev_comments = False
+                    user_tag = "@" + user_id
                     if comment_response.status == 200:
                         comment = await comment_response.json()
                         if 'id' in comment:
@@ -101,7 +102,6 @@ async def is_valid_notification(notification, headers, handled_ids, session, use
                             get_logger().debug(f"no comment_body")
                             check_prev_comments = True
                         else:
-                            user_tag = "@" + user_id
                             if user_tag not in comment_body:
                                 get_logger().debug(f"user_tag not in comment_body")
                                 check_prev_comments = True
@@ -130,12 +130,14 @@ async def is_valid_notification(notification, headers, handled_ids, session, use
                                                       artifact={"comment": comment_body})
                                     return True, handled_ids, comment, comment_body, pr_url, user_tag
 
-                            get_logger().error(f"Failed to fetch comments for PR: {pr_url}")
+                            get_logger().warning(f"Failed to fetch comments for PR: {pr_url}",
+                                                    artifact={"comments": comments})
                             return False, handled_ids
 
         return False, handled_ids
     except Exception as e:
-        get_logger().error(f"Error processing notification: {e}", artifact={"traceback": traceback.format_exc()})
+        get_logger().exception(f"Error processing polling notification",
+                               artifact={"notification": notification, "error": e})
         return False, handled_ids
 
 

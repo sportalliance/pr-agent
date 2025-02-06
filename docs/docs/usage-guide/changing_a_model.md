@@ -1,11 +1,10 @@
-## Changing a model
+## Changing a model in PR-Agent
 
 See [here](https://github.com/Codium-ai/pr-agent/blob/main/pr_agent/algo/__init__.py) for a list of available models.
 To use a different model than the default (GPT-4), you need to edit in the [configuration file](https://github.com/Codium-ai/pr-agent/blob/main/pr_agent/settings/configuration.toml#L2) the fields:
 ```
 [config]
 model = "..."
-model_turbo = "..."
 fallback_models = ["..."]
 ```
 
@@ -27,57 +26,43 @@ deployment_id = ""  # The deployment name you chose when you deployed the engine
 and set in your configuration file:
 ```
 [config]
-model="" # the OpenAI model you've deployed on Azure (e.g. gpt-3.5-turbo)
-model_turbo="" # the OpenAI model you've deployed on Azure (e.g. gpt-3.5-turbo)
-fallback_models=["..."] # the OpenAI model you've deployed on Azure (e.g. gpt-3.5-turbo)
+model="" # the OpenAI model you've deployed on Azure (e.g. gpt-4o)
+fallback_models=["..."]
 ```
+
+### Ollama
+
+You can run models locally through either [VLLM](https://docs.litellm.ai/docs/providers/vllm) or [Ollama](https://docs.litellm.ai/docs/providers/ollama)
+
+E.g. to use a new model locally via Ollama, set in `.secrets.toml` or in a configuration file:
+```
+[config]
+model = "ollama/qwen2.5-coder:32b"
+fallback_models=["ollama/qwen2.5-coder:32b"]
+custom_model_max_tokens=128000 # set the maximal input tokens for the model
+duplicate_examples=true # will duplicate the examples in the prompt, to help the model to generate structured output
+
+[ollama]
+api_base = "http://localhost:11434" # or whatever port you're running Ollama on
+```
+
+!!! note "Local models vs commercial models"
+    Qodo Merge is compatible with almost any AI model, but analyzing complex code repositories and pull requests requires a model specifically optimized for code analysis.
+    
+    Commercial models such as GPT-4, Claude Sonnet, and Gemini have demonstrated robust capabilities in generating structured output for code analysis tasks with large input. In contrast, most open-source models currently available (as of January 2025) face challenges with these complex tasks.
+
+    Based on our testing, local open-source models are suitable for experimentation and learning purposes, but they are not suitable for production-level code analysis tasks.
+    
+    Hence, for production workflows and real-world usage, we recommend using commercial models.
 
 ### Hugging Face
 
-**Local**
-You can run Hugging Face models locally through either [VLLM](https://docs.litellm.ai/docs/providers/vllm) or [Ollama](https://docs.litellm.ai/docs/providers/ollama)
-
-E.g. to use a new Hugging Face model locally via Ollama, set:
-```
-[__init__.py]
-MAX_TOKENS = {
-    "model-name-on-ollama": <max_tokens>
-}
-e.g.
-MAX_TOKENS={
-    ...,
-    "ollama/llama2": 4096
-}
-
-
-[config] # in configuration.toml
-model = "ollama/llama2"
-model_turbo = "ollama/llama2"
-fallback_models=["ollama/llama2"]
-
-[ollama] # in .secrets.toml
-api_base = ... # the base url for your Hugging Face inference endpoint
-# e.g. if running Ollama locally, you may use:
-api_base = "http://localhost:11434/"
-```
-
-### Inference Endpoints
-
 To use a new model with Hugging Face Inference Endpoints, for example, set:
 ```
-[__init__.py]
-MAX_TOKENS = {
-    "model-name-on-huggingface": <max_tokens>
-}
-e.g.
-MAX_TOKENS={
-    ...,
-    "meta-llama/Llama-2-7b-chat-hf": 4096
-}
 [config] # in configuration.toml
 model = "huggingface/meta-llama/Llama-2-7b-chat-hf"
-model_turbo = "huggingface/meta-llama/Llama-2-7b-chat-hf"
 fallback_models=["huggingface/meta-llama/Llama-2-7b-chat-hf"]
+custom_model_max_tokens=... # set the maximal input tokens for the model
 
 [huggingface] # in .secrets.toml
 key = ... # your Hugging Face api key
@@ -91,7 +76,6 @@ To use Llama2 model with Replicate, for example, set:
 ```
 [config] # in configuration.toml
 model = "replicate/llama-2-70b-chat:2c1608e18606fad2812020dc541930f2d0495ce32eee50074220b87300bc16e1"
-model_turbo = "replicate/llama-2-70b-chat:2c1608e18606fad2812020dc541930f2d0495ce32eee50074220b87300bc16e1"
 fallback_models=["replicate/llama-2-70b-chat:2c1608e18606fad2812020dc541930f2d0495ce32eee50074220b87300bc16e1"]
 [replicate] # in .secrets.toml
 key = ...
@@ -107,7 +91,6 @@ To use Llama3 model with Groq, for example, set:
 ```
 [config] # in configuration.toml
 model = "llama3-70b-8192"
-model_turbo = "llama3-70b-8192"
 fallback_models = ["groq/llama3-70b-8192"]
 [groq] # in .secrets.toml
 key = ... # your Groq api key
@@ -121,7 +104,6 @@ To use Google's Vertex AI platform and its associated models (chat-bison/codecha
 ```
 [config] # in configuration.toml
 model = "vertex_ai/codechat-bison"
-model_turbo = "vertex_ai/codechat-bison"
 fallback_models="vertex_ai/codechat-bison"
 
 [vertexai] # in .secrets.toml
@@ -140,7 +122,6 @@ To use [Google AI Studio](https://aistudio.google.com/) models, set the relevant
 ```toml
 [config] # in configuration.toml
 model="google_ai_studio/gemini-1.5-flash"
-model_turbo="google_ai_studio/gemini-1.5-flash"
 fallback_models=["google_ai_studio/gemini-1.5-flash"]
 
 [google_ai_studio] # in .secrets.toml
@@ -156,7 +137,6 @@ To use Anthropic models, set the relevant models in the configuration section of
 ```
 [config]
 model="anthropic/claude-3-opus-20240229"
-model_turbo="anthropic/claude-3-opus-20240229"
 fallback_models=["anthropic/claude-3-opus-20240229"]
 ```
 
@@ -173,7 +153,6 @@ To use Amazon Bedrock and its foundational models, add the below configuration:
 ```
 [config] # in configuration.toml
 model="bedrock/anthropic.claude-3-sonnet-20240229-v1:0"
-model_turbo="bedrock/anthropic.claude-3-sonnet-20240229-v1:0"
 fallback_models=["bedrock/anthropic.claude-v2:1"]
 ```
 
@@ -187,6 +166,25 @@ drop_params = true
 
 AWS session is automatically authenticated from your environment, but you can also explicitly set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION_NAME` environment variables. Please refer to [this document](https://litellm.vercel.app/docs/providers/bedrock) for more details.
 
+### DeepSeek
+
+To use deepseek-chat model with DeepSeek, for example, set:
+
+```toml
+[config] # in configuration.toml
+model = "deepseek/deepseek-chat"
+fallback_models=["deepseek/deepseek-chat"]
+```
+
+and fill up your key
+
+```toml
+[deepseek] # in .secrets.toml
+key = ...
+```
+
+(you can obtain a deepseek-chat key from [here](https://platform.deepseek.com))
+
 ### Custom models
 
 If the relevant model doesn't appear [here](https://github.com/Codium-ai/pr-agent/blob/main/pr_agent/algo/__init__.py), you can still use it as a custom model:
@@ -195,7 +193,6 @@ If the relevant model doesn't appear [here](https://github.com/Codium-ai/pr-agen
 ```
 [config]
 model="custom_model_name"
-model_turbo="custom_model_name"
 fallback_models=["custom_model_name"]
 ```
 (2) Set the maximal tokens for the model:

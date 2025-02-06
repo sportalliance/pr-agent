@@ -6,7 +6,9 @@ import requests
 from litellm import acompletion
 from tenacity import retry, retry_if_exception_type, stop_after_attempt
 
+from pr_agent.algo import USER_MESSAGE_ONLY_MODELS
 from pr_agent.algo.ai_handlers.base_ai_handler import BaseAiHandler
+from pr_agent.algo.utils import get_version
 from pr_agent.config_loader import get_settings
 from pr_agent.log import get_logger
 
@@ -89,6 +91,13 @@ class LiteLLMAIHandler(BaseAiHandler):
         if get_settings().get("GOOGLE_AI_STUDIO.GEMINI_API_KEY", None):
           os.environ["GEMINI_API_KEY"] = get_settings().google_ai_studio.gemini_api_key
 
+        # Support deepseek models
+        if get_settings().get("DEEPSEEK.KEY", None):
+            os.environ['DEEPSEEK_API_KEY'] = get_settings().get("DEEPSEEK.KEY")
+
+        # Models that only use user meessage
+        self.user_message_only_models = USER_MESSAGE_ONLY_MODELS
+
     def prepare_logs(self, response, system, user, resp, finish_reason):
         response_log = response.dict().copy()
         response_log['system'] = system
@@ -132,7 +141,7 @@ class LiteLLMAIHandler(BaseAiHandler):
         if "langfuse" in callbacks:
             metadata.update({
                 "trace_name": command,
-                "tags": [git_provider, command],
+                "tags": [git_provider, command, f'version:{get_version()}'],
                 "trace_metadata": {
                     "command": command,
                     "pr_url": pr_url,
@@ -141,7 +150,7 @@ class LiteLLMAIHandler(BaseAiHandler):
         if "langsmith" in callbacks:
             metadata.update({
                 "run_name": command,
-                "tags": [git_provider, command],
+                "tags": [git_provider, command, f'version:{get_version()}'],
                 "extra": {
                     "metadata": {
                         "command": command,
@@ -192,13 +201,11 @@ class LiteLLMAIHandler(BaseAiHandler):
                 messages[1]["content"] = [{"type": "text", "text": messages[1]["content"]},
                                           {"type": "image_url", "image_url": {"url": img_path}}]
 
-            # Currently O1 does not support separate system and user prompts
-            O1_MODEL_PREFIX = 'o1-'
-            model_type = model.split('/')[-1] if '/' in model else model
-            if model_type.startswith(O1_MODEL_PREFIX):
+            # Currently, some models do not support a separate system and user prompts
+            if self.user_message_only_models and any(entry.lower() in model.lower() for entry in self.user_message_only_models):
                 user = f"{system}\n\n\n{user}"
                 system = ""
-                get_logger().info(f"Using O1 model, combining system and user prompts")
+                get_logger().info(f"Using model {model}, combining system and user prompts")
                 messages = [{"role": "user", "content": user}]
                 kwargs = {
                     "model": model,
