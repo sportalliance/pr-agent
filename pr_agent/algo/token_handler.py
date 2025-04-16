@@ -19,8 +19,11 @@ class TokenEncoder:
             with cls._lock:  # Lock acquisition to ensure thread safety
                 if cls._encoder_instance is None or model != cls._model:
                     cls._model = model
-                    cls._encoder_instance = encoding_for_model(cls._model) if "gpt" in cls._model else get_encoding(
-                        "cl100k_base")
+                    try:
+                        cls._encoder_instance = encoding_for_model(cls._model) if "gpt" in cls._model else get_encoding(
+                            "o200k_base")
+                    except:
+                        cls._encoder_instance = get_encoding("o200k_base")
         return cls._encoder_instance
 
 

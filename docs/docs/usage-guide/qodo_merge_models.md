@@ -8,7 +8,7 @@ The models supported by Qodo Merge are:
 
 - `claude-3-7-sonnet` (default)
 - `o3-mini`
-- `gpt-4o`
+- `gpt-4.1`
 - `deepseek/r1`
 
 To restrict Qodo Merge to using only `o3-mini`, add this setting:
@@ -17,10 +17,10 @@ To restrict Qodo Merge to using only `o3-mini`, add this setting:
 model="o3-mini"
 ```
 
-To restrict Qodo Merge to using only `GPT-4o`, add this setting:
+To restrict Qodo Merge to using only `GPT-4.1`, add this setting:
 ```
 [config]
-model="gpt-4o"
+model="gpt-4.1"
 ```
 
 To restrict Qodo Merge to using only `deepseek-r1` us-hosted, add this setting:
