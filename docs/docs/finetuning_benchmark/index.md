@@ -1,6 +1,6 @@
 # Qodo Merge Code Fine-tuning Benchmark
 
-On coding tasks, the gap between open-source models and top closed-source models such as GPT4 is significant.
+On coding tasks, the gap between open-source models and top closed-source models such as GPT-4o is significant.
 <br>
 In practice, open-source models are unsuitable for most real-world code tasks, and require further fine-tuning to produce acceptable results.
 
@@ -68,7 +68,7 @@ Here are the prompts, and example outputs, used as input-output pairs to fine-tu
 
 ### Evaluation dataset
 
-- For each tool, we aggregated 100 additional examples to be used for evaluation. These examples were not used in the training dataset, and were manually selected to represent diverse real-world use-cases.
+- For each tool, we aggregated 200 additional examples to be used for evaluation. These examples were not used in the training dataset, and were manually selected to represent diverse real-world use-cases.
 - For each test example, we generated two responses: one from the fine-tuned model, and one from the best code model in the world, `gpt-4-turbo-2024-04-09`.
 
 - We used a third LLM to judge which response better answers the prompt, and will likely be perceived by a human as better response.

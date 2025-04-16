@@ -9,8 +9,9 @@ The tool can be triggered automatically every time a new PR is [opened](../usage
 
 ![code_suggestions_as_comment_open.png](https://codium.ai/images/pr_agent/code_suggestions_as_comment_open.png){width=512}
 
-Note that the `Apply this suggestion` checkbox, which interactively converts a suggestion into a commitable code comment, is available only for Qodo Merge💎 users.
-
+!!! note "The following features are available only for Qodo Merge 💎 users:"
+    - The `Apply this suggestion` checkbox, which interactively converts a suggestion into a committable code comment
+    - The `More` checkbox to generate additional suggestions
 
 ## Example usage
 
@@ -52,9 +53,10 @@ num_code_suggestions_per_chunk = ...
 - The `pr_commands` lists commands that will be executed automatically when a PR is opened.
 - The `[pr_code_suggestions]` section contains the configurations for the `improve` tool you want to edit (if any)
 
-### Assessing Impact 💎
+### Assessing Impact
+>`💎 feature`
 
-Note that Qodo Merge tracks two types of implementations:
+Qodo Merge tracks two types of implementations for tracking implemented suggestions:
 
 - Direct implementation - when the user directly applies the suggestion by clicking the `Apply` checkbox.
 - Indirect implementation - when the user implements the suggestion in their IDE environment. In this case, Qodo Merge will utilize, after each commit, a dedicated logic to identify if a suggestion was implemented, and will mark it as implemented.
@@ -67,8 +69,8 @@ In post-process, Qodo Merge counts the number of suggestions that were implement
 
 ![code_suggestions_asses_impact_stats_2](https://codium.ai/images/pr_agent/code_suggestions_asses_impact_stats_2.png){width=512}
 
-## Suggestion tracking 💎
-`Platforms supported: GitHub, GitLab`
+## Suggestion tracking
+>`💎 feature. Platforms supported: GitHub, GitLab`
 
 Qodo Merge employs a novel detection system to automatically [identify](https://qodo-merge-docs.qodo.ai/core-abilities/impact_evaluation/) AI code suggestions that PR authors have accepted and implemented.
 
@@ -101,8 +103,6 @@ The `improve` tool can be further customized by providing additional instruction
 
 ### Extra instructions
 
->`Platforms supported: GitHub, GitLab, Bitbucket, Azure DevOps`
-
 You can use the `extra_instructions` configuration option to give the AI model additional instructions for the `improve` tool.
 Be specific, clear, and concise in the instructions. With extra instructions, you are the prompter.
 
@@ -118,14 +118,14 @@ extra_instructions="""\
 ```
 Use triple quotes to write multi-line instructions. Use bullet points or numbers to make the instructions more readable.
 
-### Best practices 💎
+### Best practices
 
->`Platforms supported: GitHub, GitLab, Bitbucket`
+> `💎 feature. Platforms supported: GitHub, GitLab, Bitbucket`
 
-Another option to give additional guidance to the AI model is by creating a `best_practices.md` file, either in your repository's root directory or as a [**wiki page**](https://github.com/Codium-ai/pr-agent/wiki) (we recommend the wiki page, as editing and maintaining it over time is easier).
+Another option to give additional guidance to the AI model is by creating a `best_practices.md` file in your repository's root directory.
 This page can contain a list of best practices, coding standards, and guidelines that are specific to your repo/organization.
 
-The AI model will use this wiki page as a reference, and in case the PR code violates any of the guidelines, it will create additional suggestions, with a dedicated label: `Organization
+The AI model will use this `best_practices.md` file as a reference, and in case the PR code violates any of the guidelines, it will create additional suggestions, with a dedicated label: `Organization
 best practice`.
 
 Example for a python `best_practices.md` content:
@@ -149,16 +149,16 @@ Tips for writing an effective `best_practices.md` file:
     - Long files tend to contain generic guidelines already known to AI
 
 #### Local and global best practices
-By default, Qodo Merge will look for a local `best_practices.md` wiki file in the root of the relevant local repo.
+By default, Qodo Merge will look for a local `best_practices.md` in the root of the relevant local repo.
 
-If you want to enable also a global `best_practices.md` wiki file, set first in the global configuration file:
+If you want to enable also a global `best_practices.md` file, set first in the global configuration file:
 
 ```toml
 [best_practices]
 enable_global_best_practices = true
 ```
 
-Then, create a `best_practices.md` wiki file in the root of [global](https://qodo-merge-docs.qodo.ai/usage-guide/configuration_options/#global-configuration-file) configuration repository,  `pr-agent-settings`.
+Then, create a `best_practices.md` file in the root of [global](https://qodo-merge-docs.qodo.ai/usage-guide/configuration_options/#global-configuration-file) configuration repository,  `pr-agent-settings`.
 
 #### Best practices for multiple languages
 For a git organization working with multiple programming languages, you can maintain a centralized global `best_practices.md` file containing language-specific guidelines. 
@@ -191,11 +191,11 @@ And the label will be: `{organization_name} best practice`.
 
 ![best_practice](https://codium.ai/images/pr_agent/org_best_practice.png){width=512}
 
-### Auto best practices 💎
+### Auto best practices
 
->`Platforms supported: GitHub`
+>`💎 feature. Platforms supported: GitHub.`
 
-'Auto best practices' is a novel Qodo Merge capability that:
+`Auto best practices` is a novel Qodo Merge capability that:
 
 1. Identifies recurring patterns from accepted suggestions
 2. **Automatically** generates [best practices page](https://github.com/qodo-ai/pr-agent/wiki/.pr_agent_auto_best_practices) based on what your team consistently values
@@ -228,7 +228,8 @@ max_patterns = 5
 ```
 
 
-### Combining `extra instructions` and `best practices` 💎
+### Combining 'extra instructions' and 'best practices'
+> `💎 feature`
 
 The `extra instructions` configuration is more related to the `improve` tool prompt. It can be used, for example, to avoid specific suggestions ("Don't suggest to add try-except block", "Ignore changes in toml files", ...) or to emphasize specific aspects or formats ("Answer in Japanese", "Give only short suggestions", ...)
 
@@ -267,6 +268,8 @@ dual_publishing_score_threshold = x
 Where x represents the minimum score threshold (>=) for suggestions to be presented as commitable PR comments in addition to the table. Default is -1 (disabled).
 
 ### Self-review
+> `💎 feature` Platforms supported: GitHub, GitLab
+
 If you set in a configuration file:
 ```toml
 [pr_code_suggestions]
@@ -310,20 +313,73 @@ code_suggestions_self_review_text = "... (your text here) ..."
 
         To prevent unauthorized approvals, this configuration defaults to false, and cannot be altered through online comments; enabling requires a direct update to the configuration file and a commit to the repository. This ensures that utilizing the feature demands a deliberate documented decision by the repository owner.
 
+### Auto-approval
+> `💎 feature. Platforms supported: GitHub, GitLab, Bitbucket`
+
+Under specific conditions, Qodo Merge can auto-approve a PR when a specific comment is invoked, or when the PR meets certain criteria.
+
+**To ensure safety, the auto-approval feature is disabled by default.**
+To enable auto-approval features, you need to actively set one or both of the following options in a pre-defined _configuration file_:
+```toml
+[config]
+enable_comment_approval = true # For approval via comments
+enable_auto_approval = true   # For criteria-based auto-approval
+```
+
+!!! note "Notes"
+    - Note that this specific flag cannot be set with a command line argument, only in the configuration file, committed to the repository.
+    - Enabling auto-approval must be a deliberate decision by the repository owner.
+
+1\. **Auto-approval by commenting**
+
+To enable auto-approval by commenting, set in the configuration file:
+```toml
+[config]
+enable_comment_approval = true
+```
+
+After enabling, by commenting on a PR:
+```
+/review auto_approve
+```
+Qodo Merge will automatically approve the PR, and add a comment with the approval.
+
+2\. **Auto-approval when the PR meets certain criteria**
+
+To enable auto-approval based on specific criteria, first, you need to enable the top-level flag:
+```toml
+[config]
+enable_auto_approval = true
+```
+
+There are two criteria that can be set for auto-approval:
+
+- **Review effort score**
+```toml
+[config]
+enable_auto_approval = true
+auto_approve_for_low_review_effort = X # X is a number between 1 to 5
+```
+When the [review effort score](https://www.qodo.ai/images/pr_agent/review3.png) is lower or equal to X, the PR will be auto-approved.
+
+___
+- **No code suggestions**
+```toml
+[config]
+enable_auto_approval = true
+auto_approve_for_no_suggestions = true
+```
+When no [code suggestion](https://www.qodo.ai/images/pr_agent/code_suggestions_as_comment_closed.png) were found for the PR, the PR will be auto-approved.
 
 ### How many code suggestions are generated?
 Qodo Merge uses a dynamic strategy to generate code suggestions based on the size of the pull request (PR). Here's how it works:
 
-1) Chunking large PRs:
-
+#### 1. Chunking large PRs
 - Qodo Merge divides large PRs into 'chunks'.
 - Each chunk contains up to `pr_code_suggestions.max_context_tokens` tokens (default: 14,000).
 
-
-2) Generating suggestions:
-
+#### 2. Generating suggestions
 - For each chunk, Qodo Merge generates up to `pr_code_suggestions.num_code_suggestions_per_chunk` suggestions (default: 4).
-
 
 This approach has two main benefits:
 
@@ -356,7 +412,7 @@ Note: Chunking is primarily relevant for large PRs. For most PRs (up to 500 line
       </tr>
       <tr>
         <td><b>persistent_comment</b></td>
-        <td>If set to true, the improve comment will be persistent, meaning that every new improve request will edit the previous one. Default is false.</td>
+        <td>If set to true, the improve comment will be persistent, meaning that every new improve request will edit the previous one. Default is true.</td>
       </tr>
       <tr>
         <td><b>suggestions_score_threshold</b></td>
@@ -367,6 +423,10 @@ Note: Chunking is primarily relevant for large PRs. For most PRs (up to 500 line
         <td> Enable the checkbox to create a committable suggestion. Default is true.</td>
       </tr>
       <tr>
+        <td><b>enable_more_suggestions_checkbox</b></td>
+        <td> Enable the checkbox to generate more suggestions. Default is true.</td>
+      </tr>
+      <tr>
         <td><b>enable_help_text</b></td>
         <td>If set to true, the tool will display a help text in the comment. Default is true.</td>
       </tr>
@@ -375,12 +435,15 @@ Note: Chunking is primarily relevant for large PRs. For most PRs (up to 500 line
         <td>If set to true, the tool will display a reference to the PR chat in the comment. Default is true.</td>
       </tr>
       <tr>
+        <td><b>publish_output_no_suggestions</b></td>
+        <td>If set to true, the tool will publish a comment even if no suggestions were found. Default is true.</td>
+      <tr>
         <td><b>wiki_page_accepted_suggestions</b></td>
         <td>If set to true, the tool will automatically track accepted suggestions in a dedicated wiki page called `.pr_agent_accepted_suggestions`. Default is true.</td>
       </tr>
       <tr>
         <td><b>allow_thumbs_up_down</b></td>
-        <td>If set to true, all code suggestions will have thumbs up and thumbs down buttons, to encourage users to provide feedback on the suggestions. Default is false.</td>
+        <td>If set to true, all code suggestions will have thumbs up and thumbs down buttons, to encourage users to provide feedback on the suggestions. Default is false. Note that this feature is for statistics tracking. It will not affect future feedback from the AI model.</td>
       </tr>
     </table>
 
@@ -401,14 +464,12 @@ Note: Chunking is primarily relevant for large PRs. For most PRs (up to 500 line
       </tr>
     </table>
 
-## A note on code suggestions quality
+## Understanding AI Code Suggestions
 
-- AI models for code are getting better and better (Sonnet-3.5 and GPT-4), but they are not flawless. Not all the suggestions will be perfect, and a user should not accept all of them automatically. Critical reading and judgment are required.
-- While mistakes of the AI are rare but can happen, a real benefit from the suggestions of the `improve` (and [`review`](https://qodo-merge-docs.qodo.ai/tools/review/)) tool is to catch, with high probability, **mistakes or bugs done by the PR author**, when they happen. So, it's a good practice to spend the needed ~30-60 seconds to review the suggestions, even if not all of them are always relevant.
-- The hierarchical structure of the suggestions is designed to help the user to _quickly_ understand them, and to decide which ones are relevant and which are not:
-
-    - Only if the `Category` header is relevant, the user should move to the summarized suggestion description
-    - Only if the summarized suggestion description is relevant, the user should click on the collapsible, to read the full suggestion description with a code preview example.
-
-- In addition, we recommend to use the [`extra_instructions`](https://qodo-merge-docs.qodo.ai/tools/improve/#extra-instructions-and-best-practices) field to guide the model to suggestions that are more relevant to the specific needs of the project.
-- The interactive [PR chat](https://qodo-merge-docs.qodo.ai/chrome-extension/) also provides an easy way to get more tailored suggestions and feedback from the AI model.
+- **AI Limitations:** AI models for code are getting better and better, but they are not flawless. Not all the suggestions will be perfect, and a user should not accept all of them automatically. Critical reading and judgment are required. Mistakes of the AI are rare but can happen, and it is usually quite easy for a human to spot them.
+- **Purpose of Suggestions:**
+    - **Self-reflection:** The suggestions aim to enable developers to _self-reflect_ and improve their pull requests. This process can help to identify blind spots, uncover missed edge cases, and enhance code readability and coherency. Even when a specific code suggestion isn't suitable, the underlying issue it highlights often reveals something important that might deserve attention.
+    - **Bug detection:** The suggestions also alert on any _critical bugs_ that may have been identified during the analysis. This provides an additional safety net to catch potential issues before they make it into production. It's perfectly acceptable to implement only the suggestions you find valuable for your specific context.
+- **Hierarchy:** Presenting the suggestions in a structured hierarchical table enables the user to _quickly_ understand them, and to decide which ones are relevant and which are not.
+- **Customization:** To guide the model to suggestions that are more relevant to the specific needs of your project, we recommend to use the [`extra_instructions`](https://qodo-merge-docs.qodo.ai/tools/improve/#extra-instructions-and-best-practices) and [`best practices`](https://qodo-merge-docs.qodo.ai/tools/improve/#best-practices) fields.
+- **Interactive usage:** The interactive [PR chat](https://qodo-merge-docs.qodo.ai/chrome-extension/) also provides an easy way to get more tailored suggestions and feedback from the AI model.

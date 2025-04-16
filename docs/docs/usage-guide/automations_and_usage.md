@@ -7,19 +7,18 @@ Examples of invoking the different tools via the CLI:
 - **Describe**:     `python -m pr_agent.cli --pr_url=<pr_url>  describe`
 - **Improve**:      `python -m pr_agent.cli --pr_url=<pr_url>  improve`
 - **Ask**:          `python -m pr_agent.cli --pr_url=<pr_url>  ask "Write me a poem about this PR"`
-- **Reflect**:      `python -m pr_agent.cli --pr_url=<pr_url>  reflect`
 - **Update Changelog**:      `python -m pr_agent.cli --pr_url=<pr_url>  update_changelog`
 
 `<pr_url>` is the url of the relevant PR (for example: [#50](https://github.com/Codium-ai/pr-agent/pull/50)).
 
 **Notes:**
 
-(1) in addition to editing your local configuration file, you can also change any configuration value by adding it to the command line:
+1. in addition to editing your local configuration file, you can also change any configuration value by adding it to the command line:
 ```
 python -m pr_agent.cli --pr_url=<pr_url>  /review --pr_reviewer.extra_instructions="focus on the file: ..."
 ```
 
-(2) You can print results locally, without publishing them, by setting in `configuration.toml`:
+2. You can print results locally, without publishing them, by setting in `configuration.toml`:
 ```
 [config]
 publish_output=false
@@ -27,14 +26,9 @@ verbosity_level=2
 ```
 This is useful for debugging or experimenting with different tools.
 
-(3)
+3. **git provider**: The [git_provider](https://github.com/Codium-ai/pr-agent/blob/main/pr_agent/settings/configuration.toml#L5) field in a configuration file determines the GIT provider that will be used by Qodo Merge. Currently, the following providers are supported:
+`github` **(default)**, `gitlab`, `bitbucket`, `azure`, `codecommit`, `local`, and `gerrit`.
 
-**git provider**: The [git_provider](https://github.com/Codium-ai/pr-agent/blob/main/pr_agent/settings/configuration.toml#L5) field in a configuration file determines the GIT provider that will be used by Qodo Merge. Currently, the following providers are supported:
-`
-"github", "gitlab", "bitbucket", "azure", "codecommit", "local", "gerrit"
-`
-
-Default is "github".
 
 ### CLI Health Check
 To verify that Qodo Merge has been configured correctly, you can run this health check command from the repository root:
@@ -67,7 +61,6 @@ Commands for invoking the different tools via comments:
 - **Describe**:     `/describe`
 - **Improve**:      `/improve`  (or `/improve_code` for bitbucket, since `/improve` is sometimes reserved)
 - **Ask**:          `/ask "..."`
-- **Reflect**:      `/reflect`
 - **Update Changelog**:      `/update_changelog`
 
 
@@ -173,7 +166,7 @@ If not set, the default configuration is `["opened", "reopened", "ready_for_revi
 
 `github_action_config.enable_output` are used to enable/disable github actions [output parameter](https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#outputs-for-docker-container-and-javascript-actions) (default is `true`).
 Review result is output as JSON to `steps.{step-id}.outputs.review` property.
-The JSON structure is equivalent to the yaml data structure defined in [pr_reviewer_prompts.toml](https://github.com/idubnori/pr-agent/blob/main/pr_agent/settings/pr_reviewer_prompts.toml).
+The JSON structure is equivalent to the yaml data structure defined in [pr_reviewer_prompts.toml](https://github.com/qodo-ai/pr-agent/blob/main/pr_agent/settings/pr_reviewer_prompts.toml).
 
 Note that you can give additional config parameters by adding environment variables to `.github/workflows/pr_agent.yml`, or by using a `.pr_agent.toml` [configuration file](https://qodo-merge-docs.qodo.ai/usage-guide/configuration_options/#global-configuration-file) in the root of your repo
 
@@ -213,9 +206,9 @@ push_commands = [
 Note that to use the 'handle_push_trigger' feature, you need to give the gitlab webhook also the "Push events" scope.
 
 ### BitBucket App
-Similar to GitHub app, when running Qodo Merge from BitBucket App, the default [configuration file](https://github.com/Codium-ai/pr-agent/blob/main/pr_agent/settings/configuration.toml) from a pre-built docker will be initially loaded.
+Similar to GitHub app, when running Qodo Merge from BitBucket App, the default [configuration file](https://github.com/Codium-ai/pr-agent/blob/main/pr_agent/settings/configuration.toml) will be initially loaded.
 
-By uploading a local `.pr_agent.toml` file to the root of the repo's main branch, you can edit and customize any configuration parameter. Note that you need to upload `.pr_agent.toml` prior to creating a PR, in order for the configuration to take effect.
+By uploading a local `.pr_agent.toml` file to the root of the repo's default branch, you can edit and customize any configuration parameter. Note that you need to upload `.pr_agent.toml` prior to creating a PR, in order for the configuration to take effect.
 
 For example, if your local `.pr_agent.toml` file contains:
 ```toml

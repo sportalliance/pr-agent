@@ -1,6 +1,6 @@
 site_name: Qodo Merge (and open-source PR-Agent)
-repo_url: https://github.com/Codium-ai/pr-agent
-repo_name: Codium-ai/pr-agent
+repo_url: https://github.com/qodo-ai/pr-agent
+repo_name: Qodo-ai/pr-agent
 
 nav:
   - Overview:
@@ -20,7 +20,7 @@ nav:
     - Managing Mail Notifications: 'usage-guide/mail_notifications.md'
     - Changing a Model: 'usage-guide/changing_a_model.md'
     - Additional Configurations: 'usage-guide/additional_configurations.md'
-    - 💎 Qodo Merge Models: 'usage-guide/PR_agent_pro_models'
+    - 💎 Qodo Merge Models: 'usage-guide/qodo_merge_models.md'
   - Tools:
     - 'tools/index.md'
     - Describe: 'tools/describe.md'
@@ -28,7 +28,7 @@ nav:
     - Improve: 'tools/improve.md'
     - Ask: 'tools/ask.md'
     - Update Changelog: 'tools/update_changelog.md'
-    - Similar Issues: 'tools/similar_issues.md'
+    - Help Docs: 'tools/help_docs.md'
     - Help: 'tools/help.md'
     - 💎 Analyze: 'tools/analyze.md'
     - 💎 Test: 'tools/test.md'
@@ -47,17 +47,19 @@ nav:
       - Dynamic context: 'core-abilities/dynamic_context.md'
       - Self-reflection: 'core-abilities/self_reflection.md'
       - Impact evaluation: 'core-abilities/impact_evaluation.md'
-      - Interactivity: 'core-abilities/interactivity.md'
-      - Compression strategy: 'core-abilities/compression_strategy.md'
-      - Code-oriented YAML: 'core-abilities/code_oriented_yaml.md'
+      - RAG context enrichment: 'core-abilities/rag_context_enrichment.md'
       - Static code analysis: 'core-abilities/static_code_analysis.md'
-      - Code Fine-tuning Benchmark: 'finetuning_benchmark/index.md'
+      - Compression strategy: 'core-abilities/compression_strategy.md'
+      - Code validation: 'core-abilities/code_validation.md'
+      - Interactivity: 'core-abilities/interactivity.md'
+      - Code fine-tuning benchmark: 'finetuning_benchmark/index.md'
   - Chrome Extension:
       - Qodo Merge Chrome Extension: 'chrome-extension/index.md'
       - Features: 'chrome-extension/features.md'
       - Data Privacy: 'chrome-extension/data_privacy.md'
   - FAQ:
       - FAQ: 'faq/index.md'
+  - AI Docs Search: 'ai_search/index.md'
 #  - Code Fine-tuning Benchmark: 'finetuning_benchmark/index.md'
 
 theme:
@@ -153,4 +155,4 @@ markdown_extensions:
 
 
 copyright: |
-  &copy; 2024 <a href="https://www.codium.ai/"  target="_blank" rel="noopener">CodiumAI</a>
+  &copy; 2025 <a href="https://www.codium.ai/"  target="_blank" rel="noopener">QodoAI</a>

@@ -7,10 +7,11 @@ Qodo Merge utilizes a variety of core abilities to provide a comprehensive and e
 - [Dynamic context](https://qodo-merge-docs.qodo.ai/core-abilities/dynamic_context/)
 - [Self-reflection](https://qodo-merge-docs.qodo.ai/core-abilities/self_reflection/)
 - [Impact evaluation](https://qodo-merge-docs.qodo.ai/core-abilities/impact_evaluation/)
-- [Interactivity](https://qodo-merge-docs.qodo.ai/core-abilities/interactivity/)
-- [Compression strategy](https://qodo-merge-docs.qodo.ai/core-abilities/compression_strategy/)
-- [Code-oriented YAML](https://qodo-merge-docs.qodo.ai/core-abilities/code_oriented_yaml/)
+- [RAG context enrichment](https://qodo-merge-docs.qodo.ai/core-abilities/rag_context_enrichment/)
 - [Static code analysis](https://qodo-merge-docs.qodo.ai/core-abilities/static_code_analysis/)
+- [Compression strategy](https://qodo-merge-docs.qodo.ai/core-abilities/compression_strategy/)
+- [Code validation](https://qodo-merge-docs.qodo.ai/core-abilities/code_validation/)
+- [Interactivity](https://qodo-merge-docs.qodo.ai/core-abilities/interactivity/)
 - [Code fine-tuning benchmark](https://qodo-merge-docs.qodo.ai/finetuning_benchmark/)
 
 ## Blogs

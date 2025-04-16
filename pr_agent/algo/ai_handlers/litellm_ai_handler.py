@@ -6,11 +6,12 @@ import requests
 from litellm import acompletion
 from tenacity import retry, retry_if_exception_type, stop_after_attempt
 
-from pr_agent.algo import USER_MESSAGE_ONLY_MODELS
+from pr_agent.algo import CLAUDE_EXTENDED_THINKING_MODELS, NO_SUPPORT_TEMPERATURE_MODELS, SUPPORT_REASONING_EFFORT_MODELS, USER_MESSAGE_ONLY_MODELS
 from pr_agent.algo.ai_handlers.base_ai_handler import BaseAiHandler
-from pr_agent.algo.utils import get_version
+from pr_agent.algo.utils import ReasoningEffort, get_version
 from pr_agent.config_loader import get_settings
 from pr_agent.log import get_logger
+import json
 
 OPENAI_RETRIES = 5
 
@@ -40,11 +41,6 @@ class LiteLLMAIHandler(BaseAiHandler):
             os.environ["AWS_ACCESS_KEY_ID"] = get_settings().aws.AWS_ACCESS_KEY_ID
             os.environ["AWS_SECRET_ACCESS_KEY"] = get_settings().aws.AWS_SECRET_ACCESS_KEY
             os.environ["AWS_REGION_NAME"] = get_settings().aws.AWS_REGION_NAME
-        if get_settings().get("litellm.use_client"):
-            litellm_token = get_settings().get("litellm.LITELLM_TOKEN")
-            assert litellm_token, "LITELLM_TOKEN is required"
-            os.environ["LITELLM_TOKEN"] = litellm_token
-            litellm.use_client = True
         if get_settings().get("LITELLM.DROP_PARAMS", None):
             litellm.drop_params = get_settings().litellm.drop_params
         if get_settings().get("LITELLM.SUCCESS_CALLBACK", None):
@@ -95,8 +91,21 @@ class LiteLLMAIHandler(BaseAiHandler):
         if get_settings().get("DEEPSEEK.KEY", None):
             os.environ['DEEPSEEK_API_KEY'] = get_settings().get("DEEPSEEK.KEY")
 
+        # Support deepinfra models
+        if get_settings().get("DEEPINFRA.KEY", None):
+            os.environ['DEEPINFRA_API_KEY'] = get_settings().get("DEEPINFRA.KEY")
+
         # Models that only use user meessage
         self.user_message_only_models = USER_MESSAGE_ONLY_MODELS
+
+        # Model that doesn't support temperature argument
+        self.no_support_temperature_models = NO_SUPPORT_TEMPERATURE_MODELS
+
+        # Models that support reasoning effort
+        self.support_reasoning_models = SUPPORT_REASONING_EFFORT_MODELS
+
+        # Models that support extended thinking
+        self.claude_extended_thinking_models = CLAUDE_EXTENDED_THINKING_MODELS
 
     def prepare_logs(self, response, system, user, resp, finish_reason):
         response_log = response.dict().copy()
@@ -109,6 +118,43 @@ class LiteLLMAIHandler(BaseAiHandler):
         else:
             response_log['main_pr_language'] = 'unknown'
         return response_log
+
+    def _configure_claude_extended_thinking(self, model: str, kwargs: dict) -> dict:
+        """
+        Configure Claude extended thinking parameters if applicable.
+
+        Args:
+            model (str): The AI model being used
+            kwargs (dict): The keyword arguments for the model call
+
+        Returns:
+            dict: Updated kwargs with extended thinking configuration
+        """
+        extended_thinking_budget_tokens = get_settings().config.get("extended_thinking_budget_tokens", 2048)
+        extended_thinking_max_output_tokens = get_settings().config.get("extended_thinking_max_output_tokens", 4096)
+
+        # Validate extended thinking parameters
+        if not isinstance(extended_thinking_budget_tokens, int) or extended_thinking_budget_tokens <= 0:
+            raise ValueError(f"extended_thinking_budget_tokens must be a positive integer, got {extended_thinking_budget_tokens}")
+        if not isinstance(extended_thinking_max_output_tokens, int) or extended_thinking_max_output_tokens <= 0:
+            raise ValueError(f"extended_thinking_max_output_tokens must be a positive integer, got {extended_thinking_max_output_tokens}")
+        if extended_thinking_max_output_tokens < extended_thinking_budget_tokens:
+            raise ValueError(f"extended_thinking_max_output_tokens ({extended_thinking_max_output_tokens}) must be greater than or equal to extended_thinking_budget_tokens ({extended_thinking_budget_tokens})")
+
+        kwargs["thinking"] = {
+            "type": "enabled",
+            "budget_tokens": extended_thinking_budget_tokens
+        }
+        if get_settings().config.verbosity_level >= 2:
+            get_logger().info(f"Adding max output tokens {extended_thinking_max_output_tokens} to model {model}, extended thinking budget tokens: {extended_thinking_budget_tokens}")
+        kwargs["max_tokens"] = extended_thinking_max_output_tokens
+
+        # temperature may only be set to 1 when thinking is enabled
+        if get_settings().config.verbosity_level >= 2:
+            get_logger().info("Temperature may only be set to 1 when thinking is enabled with claude models.")
+        kwargs["temperature"] = 1
+
+        return kwargs
 
     def add_litellm_callbacks(selfs, kwargs) -> dict:
         captured_extra = []
@@ -202,7 +248,7 @@ class LiteLLMAIHandler(BaseAiHandler):
                                           {"type": "image_url", "image_url": {"url": img_path}}]
 
             # Currently, some models do not support a separate system and user prompts
-            if self.user_message_only_models and any(entry.lower() in model.lower() for entry in self.user_message_only_models):
+            if model in self.user_message_only_models or get_settings().config.custom_reasoning_model:
                 user = f"{system}\n\n\n{user}"
                 system = ""
                 get_logger().info(f"Using model {model}, combining system and user prompts")
@@ -219,10 +265,25 @@ class LiteLLMAIHandler(BaseAiHandler):
                     "model": model,
                     "deployment_id": deployment_id,
                     "messages": messages,
-                    "temperature": temperature,
                     "timeout": get_settings().config.ai_timeout,
                     "api_base": self.api_base,
                 }
+
+            # Add temperature only if model supports it
+            if model not in self.no_support_temperature_models and not get_settings().config.custom_reasoning_model:
+                # get_logger().info(f"Adding temperature with value {temperature} to model {model}.")
+                kwargs["temperature"] = temperature
+
+            # Add reasoning_effort if model supports it
+            if (model in self.support_reasoning_models):
+                supported_reasoning_efforts = [ReasoningEffort.HIGH.value, ReasoningEffort.MEDIUM.value, ReasoningEffort.LOW.value]
+                reasoning_effort = get_settings().config.reasoning_effort if (get_settings().config.reasoning_effort in supported_reasoning_efforts) else ReasoningEffort.MEDIUM.value
+                get_logger().info(f"Adding reasoning_effort with value {reasoning_effort} to model {model}.")
+                kwargs["reasoning_effort"] = reasoning_effort
+
+            # https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
+            if (model in self.claude_extended_thinking_models) and get_settings().config.get("enable_claude_extended_thinking", False):
+                kwargs = self._configure_claude_extended_thinking(model, kwargs)
 
             if get_settings().litellm.get("enable_callbacks", False):
                 kwargs = self.add_litellm_callbacks(kwargs)
@@ -236,6 +297,16 @@ class LiteLLMAIHandler(BaseAiHandler):
 
             if self.repetition_penalty:
                 kwargs["repetition_penalty"] = self.repetition_penalty
+
+            #Added support for extra_headers while using litellm to call underlying model, via a api management gateway, would allow for passing custom headers for security and authorization
+            if get_settings().get("LITELLM.EXTRA_HEADERS", None):
+                try:
+                    litellm_extra_headers = json.loads(get_settings().litellm.extra_headers)
+                    if not isinstance(litellm_extra_headers, dict):
+                        raise ValueError("LITELLM.EXTRA_HEADERS must be a JSON object")
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"LITELLM.EXTRA_HEADERS contains invalid JSON: {str(e)}")
+                kwargs["extra_headers"] = litellm_extra_headers
 
             get_logger().debug("Prompts", artifact={"system": system, "user": user})
 

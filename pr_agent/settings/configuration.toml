@@ -1,15 +1,22 @@
+# Important: This file contains all available configuration options.
+# Do not copy this entire file to your repository configuration.
+# Your repository configuration should only include options you wish to override from the defaults.
+#
+# Use this page: 'https://qodo-merge-docs.qodo.ai/ai_search/' to ask questions about the configuration options.
+
 [config]
 # models
-model="gpt-4o-2024-11-20"
-fallback_models=["gpt-4o-2024-08-06"]
+model="o3-mini"
+fallback_models=["gpt-4o-2024-11-20"]
 #model_weak="gpt-4o-mini-2024-07-18" # optional, a weaker model to use for some easier tasks
 # CLI
 git_provider="github"
 publish_output=true
 publish_output_progress=true
-publish_output_no_suggestions=true
 verbosity_level=0 # 0,1,2
 use_extra_bad_extensions=false
+# Log
+log_level="DEBUG"
 # Configurations
 use_wiki_settings_file=true
 use_repo_settings_file=true
@@ -17,11 +24,14 @@ use_global_settings_file=true
 disable_auto_feedback = false
 ai_timeout=120 # 2minutes
 skip_keys = []
+custom_reasoning_model = false # when true, disables system messages and temperature controls for models that don't support chat-style inputs
+response_language="en-US" # Language locales code for PR responses in ISO 3166 and ISO 639 format (e.g., "en-US", "it-IT", "zh-CN", ...)
 # token limits
 max_description_tokens = 500
 max_commits_tokens = 500
 max_model_tokens = 32000 # Limits the maximum number of tokens that can be used by any model, regardless of the model's default capabilities.
 custom_model_max_tokens=-1 # for models not in the default list
+model_token_count_estimate_factor=0.3 # factor to increase the token count estimate, in order to reduce likelihood of model failure due to too many tokens - applicable only when requesting an accurate estimate.
 # patch extension logic
 patch_extension_skip_types =[".md",".txt"]
 allow_dynamic_context=true
@@ -47,6 +57,16 @@ ignore_pr_authors = [] # authors to ignore from PR agent when an PR is created
 #
 is_auto_command = false # will be auto-set to true if the command is triggered by an automation
 enable_ai_metadata = false # will enable adding ai metadata
+reasoning_effort = "medium" # "low", "medium", "high"
+# auto approval 💎
+enable_auto_approval=false # Set to true to enable auto-approval of PRs under certain conditions
+auto_approve_for_low_review_effort=-1 # -1 to disable, [1-5] to set the threshold for auto-approval
+auto_approve_for_no_suggestions=false # If true, the PR will be auto-approved if there are no suggestions
+# extended thinking for Claude reasoning models
+enable_claude_extended_thinking = false # Set to true to enable extended thinking feature
+extended_thinking_budget_tokens = 2048
+extended_thinking_max_output_tokens = 4096
+
 
 [pr_reviewer] # /review #
 # enable/disable features
@@ -69,9 +89,6 @@ minimal_commits_for_incremental_review=0
 minimal_minutes_for_incremental_review=0
 enable_intro_text=true
 enable_help_text=false # Determines whether to include help text in the PR review. Enabled by default.
-# auto approval
-enable_auto_approval=false
-
 
 [pr_description] # /describe #
 publish_labels=false
@@ -89,7 +106,7 @@ publish_description_as_comment_persistent=true
 ## changes walkthrough section
 enable_semantic_files_types=true
 collapsible_file_list='adaptive' # true, false, 'adaptive'
-collapsible_file_list_threshold=8
+collapsible_file_list_threshold=6
 inline_file_summary=false # false, true, 'table'
 # markers
 use_description_markers=false
@@ -114,9 +131,9 @@ focus_only_on_problems=true
 extra_instructions = ""
 enable_help_text=false
 enable_chat_text=false
-enable_intro_text=true
 persistent_comment=true
 max_history_len=4
+publish_output_no_suggestions=true
 # enable to apply suggestion 💎
 apply_suggestions_checkbox=true
 # suggestions scoring
@@ -131,6 +148,7 @@ max_number_of_calls = 3
 parallel_calls = true
 
 final_clip_factor = 0.8
+decouple_hunks = false
 # self-review checkbox
 demand_code_suggestions_self_review=false # add a checkbox for the author to self-review the code suggestions
 code_suggestions_self_review_text= "**Author self-review**: I have reviewed the PR code suggestions, and addressed the relevant ones."
@@ -195,6 +213,14 @@ force_local_db=false
 num_retrieved_snippets=5
 
 [pr_config] # /config #
+
+[pr_help_docs]
+repo_url = "" #If not overwritten, will use the repo from where the context came from (issue or PR)
+repo_default_branch = "main"
+docs_path = "docs"
+exclude_root_readme = false
+supported_doc_exts = [".md", ".mdx", ".rst"]
+enable_help_text=false
 
 [github]
 # The type of deployment to create. Valid values are 'app' or 'user'.
@@ -323,3 +349,11 @@ utilize_auto_best_practices = true # public - disable usage of auto best practic
 extra_instructions = "" # public - extra instructions to the auto best practices generation prompt
 content = ""
 max_patterns = 5 # max number of patterns to be detected
+
+
+[azure_devops_server]
+pr_commands = [
+    "/describe",
+    "/review",
+    "/improve",
+]

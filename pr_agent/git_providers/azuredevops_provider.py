@@ -183,6 +183,7 @@ class AzureDevopsProvider(GitProvider):
         return True
 
     def set_pr(self, pr_url: str):
+        self.pr_url = pr_url
         self.workspace_slug, self.repo_slug, self.pr_num = self._parse_pr_url(pr_url)
         self.pr = self._get_pr()
 
@@ -382,7 +383,7 @@ class AzureDevopsProvider(GitProvider):
             get_logger().debug(f"Skipping publish_comment for temporary comment: {pr_comment}")
             return None
         comment = Comment(content=pr_comment)
-        thread = CommentThread(comments=[comment], thread_context=thread_context, status=5)
+        thread = CommentThread(comments=[comment], thread_context=thread_context, status=1)
         thread_response = self.azure_devops_client.create_thread(
             comment_thread=thread,
             project=self.workspace_slug,
@@ -614,8 +615,11 @@ class AzureDevopsProvider(GitProvider):
             return pr_id
         except Exception as e:
             if get_settings().config.verbosity_level >= 2:
-                get_logger().error(f"Failed to get pr id, error: {e}")
+                get_logger().info(f"Failed to get pr id, error: {e}")
             return ""
 
     def publish_file_comments(self, file_comments: list) -> bool:
         pass
+
+    def get_line_link(self, relevant_file: str, relevant_line_start: int, relevant_line_end: int = None) -> str:
+        return self.pr_url+f"?_a=files&path={relevant_file}"

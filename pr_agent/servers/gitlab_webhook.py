@@ -19,34 +19,11 @@ from pr_agent.git_providers.utils import apply_repo_settings
 from pr_agent.log import LoggingFormat, get_logger, setup_logger
 from pr_agent.secret_providers import get_secret_provider
 
-setup_logger(fmt=LoggingFormat.JSON, level="DEBUG")
+setup_logger(fmt=LoggingFormat.JSON, level=get_settings().get("CONFIG.LOG_LEVEL", "DEBUG"))
 router = APIRouter()
 
 secret_provider = get_secret_provider() if get_settings().get("CONFIG.SECRET_PROVIDER") else None
 
-
-async def get_mr_url_from_commit_sha(commit_sha, gitlab_token, project_id):
-    try:
-        import requests
-        headers = {
-            'Private-Token': f'{gitlab_token}'
-        }
-        # API endpoint to find MRs containing the commit
-        gitlab_url = get_settings().get("GITLAB.URL", 'https://gitlab.com')
-        response = requests.get(
-            f'{gitlab_url}/api/v4/projects/{project_id}/repository/commits/{commit_sha}/merge_requests',
-            headers=headers
-        )
-        merge_requests = response.json()
-        if merge_requests and response.status_code == 200:
-            pr_url = merge_requests[0]['web_url']
-            return pr_url
-        else:
-            get_logger().info(f"No merge requests found for commit: {commit_sha}")
-            return None
-    except Exception as e:
-        get_logger().error(f"Failed to get MR url from commit sha: {e}")
-        return None
 
 async def handle_request(api_url: str, body: str, log_context: dict, sender_id: str):
     log_context["action"] = body
@@ -94,6 +71,31 @@ def is_bot_user(data) -> bool:
         get_logger().error(f"Failed 'is_bot_user' logic: {e}")
     return False
 
+def is_draft(data) -> bool:
+    try:
+        if 'draft' in data.get('object_attributes', {}):
+            return data['object_attributes']['draft']
+
+        # for gitlab server version before 16
+        elif 'Draft:' in data.get('object_attributes', {}).get('title'):
+            return True
+    except Exception as e:
+        get_logger().error(f"Failed 'is_draft' logic: {e}")
+    return False
+
+def is_draft_ready(data) -> bool:
+    try:
+        if 'draft' in data.get('changes', {}):
+            if data['changes']['draft']['previous'] == 'true' and data['changes']['draft']['current'] == 'false':
+                return True
+            
+        # for gitlab server version before 16
+        elif 'title' in data.get('changes', {}):
+            if 'Draft:' in data['changes']['title']['previous'] and 'Draft:' not in data['changes']['title']['current']:
+                return True
+    except Exception as e:
+        get_logger().error(f"Failed 'is_draft_ready' logic: {e}")
+    return False
 
 def should_process_pr_logic(data) -> bool:
     try:
@@ -190,22 +192,48 @@ async def gitlab_webhook(background_tasks: BackgroundTasks, request: Request):
         # ignore bot users
         if is_bot_user(data):
             return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder({"message": "success"}))
-        if data.get('event_type') != 'note': # not a comment
+
+        log_context["sender"] = sender
+        if data.get('object_kind') == 'merge_request':
             # ignore MRs based on title, labels, source and target branches
             if not should_process_pr_logic(data):
                 return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder({"message": "success"}))
+            object_attributes = data.get('object_attributes', {})
+            if object_attributes.get('action') in ['open', 'reopen']:
+                url = object_attributes.get('url')
+                get_logger().info(f"New merge request: {url}")
+                if is_draft(data):
+                    get_logger().info(f"Skipping draft MR: {url}")
+                    return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder({"message": "success"}))
 
-        log_context["sender"] = sender
-        if data.get('object_kind') == 'merge_request' and data['object_attributes'].get('action') in ['open', 'reopen']:
-            title = data['object_attributes'].get('title')
-            url = data['object_attributes'].get('url')
-            draft = data['object_attributes'].get('draft')
-            get_logger().info(f"New merge request: {url}")
-            if draft:
-                get_logger().info(f"Skipping draft MR: {url}")
-                return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder({"message": "success"}))
+                await _perform_commands_gitlab("pr_commands", PRAgent(), url, log_context, data)
 
-            await _perform_commands_gitlab("pr_commands", PRAgent(), url, log_context, data)
+            # for push event triggered merge requests
+            elif object_attributes.get('action') == 'update' and object_attributes.get('oldrev'):
+                url = object_attributes.get('url')
+                get_logger().info(f"New merge request: {url}")
+                if is_draft(data):
+                    get_logger().info(f"Skipping draft MR: {url}")
+                    return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder({"message": "success"}))
+
+                commands_on_push = get_settings().get(f"gitlab.push_commands", {})
+                handle_push_trigger = get_settings().get(f"gitlab.handle_push_trigger", False)
+                if not commands_on_push or not handle_push_trigger:
+                    get_logger().info("Push event, but no push commands found or push trigger is disabled")
+                    return JSONResponse(status_code=status.HTTP_200_OK,
+                                        content=jsonable_encoder({"message": "success"}))
+
+                get_logger().debug(f'A push event has been received: {url}')
+                await _perform_commands_gitlab("push_commands", PRAgent(), url, log_context, data)
+                
+            # for draft to ready triggered merge requests
+            elif object_attributes.get('action') == 'update' and is_draft_ready(data):
+                url = object_attributes.get('url')
+                get_logger().info(f"Draft MR is ready: {url}")
+
+                # same as open MR
+                await _perform_commands_gitlab("pr_commands", PRAgent(), url, log_context, data)
+
         elif data.get('object_kind') == 'note' and data.get('event_type') == 'note': # comment on MR
             if 'merge_request' in data:
                 mr = data['merge_request']
@@ -217,29 +245,6 @@ async def gitlab_webhook(background_tasks: BackgroundTasks, request: Request):
                     body = handle_ask_line(body, data)
 
                 await handle_request(url, body, log_context, sender_id)
-        elif data.get('object_kind') == 'push' and data.get('event_name') == 'push':
-            try:
-                project_id = data['project_id']
-                commit_sha = data['checkout_sha']
-                url = await get_mr_url_from_commit_sha(commit_sha, gitlab_token, project_id)
-                if not url:
-                    get_logger().info(f"No MR found for commit: {commit_sha}")
-                    return JSONResponse(status_code=status.HTTP_200_OK,
-                                        content=jsonable_encoder({"message": "success"}))
-
-                # we need first to apply_repo_settings
-                apply_repo_settings(url)
-                commands_on_push = get_settings().get(f"gitlab.push_commands", {})
-                handle_push_trigger = get_settings().get(f"gitlab.handle_push_trigger", False)
-                if not commands_on_push or not handle_push_trigger:
-                    get_logger().info("Push event, but no push commands found or push trigger is disabled")
-                    return JSONResponse(status_code=status.HTTP_200_OK,
-                                        content=jsonable_encoder({"message": "success"}))
-
-                get_logger().debug(f'A push event has been received: {url}')
-                await _perform_commands_gitlab("push_commands", PRAgent(), url, log_context, data)
-            except Exception as e:
-                get_logger().error(f"Failed to handle push event: {e}")
 
     background_tasks.add_task(inner, request_json)
     end_time = datetime.now()

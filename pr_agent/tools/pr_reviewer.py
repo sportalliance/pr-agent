@@ -95,6 +95,7 @@ class PRReviewer:
             "is_ai_metadata":  get_settings().get("config.enable_ai_metadata", False),
             "related_tickets": get_settings().get('related_tickets', []),
             'duplicate_prompt_examples': get_settings().config.get('duplicate_prompt_examples', False),
+            "date": datetime.datetime.now().strftime('%Y-%m-%d'),
         }
 
         self.token_handler = TokenHandler(
@@ -122,10 +123,10 @@ class PRReviewer:
             if self.incremental.is_incremental and not self._can_run_incremental_review():
                 return None
 
-            if isinstance(self.args, list) and self.args and self.args[0] == 'auto_approve':
-                get_logger().info(f'Auto approve flow PR: {self.pr_url} ...')
-                self.auto_approve_logic()
-                return None
+            # if isinstance(self.args, list) and self.args and self.args[0] == 'auto_approve':
+            #     get_logger().info(f'Auto approve flow PR: {self.pr_url} ...')
+            #     self.auto_approve_logic()
+            #     return None
 
             get_logger().info(f'Reviewing PR: {self.pr_url} ...')
             relevant_configs = {'pr_reviewer': dict(get_settings().pr_reviewer),
@@ -227,6 +228,10 @@ class PRReviewer:
                                         "relevant_file:", "relevant_line:", "suggestion:"],
                          first_key=first_key, last_key=last_key)
         github_action_output(data, 'review')
+
+        if 'review' not in data:
+            get_logger().exception("Failed to parse review data", artifact={"data": data})
+            return ""
 
         # move data['review'] 'key_issues_to_review' key to the end of the dictionary
         if 'key_issues_to_review' in data['review']:
@@ -371,7 +376,7 @@ class PRReviewer:
                     else:
                         get_logger().warning(f"Unexpected type for estimated_effort: {type(estimated_effort)}")
                     if 1 <= estimated_effort_number <= 5:  # 1, because ...
-                        review_labels.append(f'Review effort [1-5]: {estimated_effort_number}')
+                        review_labels.append(f'Review effort {estimated_effort_number}/5')
                 if get_settings().pr_reviewer.enable_review_labels_security and get_settings().pr_reviewer.require_security_review:
                     security_concerns = data['review']['security_concerns']  # yes, because ...
                     security_concerns_bool = 'yes' in security_concerns.lower() or 'true' in security_concerns.lower()
@@ -401,7 +406,7 @@ class PRReviewer:
         """
         Auto-approve a pull request if it meets the conditions for auto-approval.
         """
-        if get_settings().pr_reviewer.enable_auto_approval:
+        if get_settings().config.enable_auto_approval:
             is_auto_approved = self.git_provider.auto_approve()
             if is_auto_approved:
                 get_logger().info("Auto-approved PR")

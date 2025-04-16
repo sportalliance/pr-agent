@@ -41,7 +41,7 @@ Qodo Merge will know to remove the surrounding quotes when reading the configura
 `Platforms supported: GitHub, GitLab, Bitbucket, Azure DevOps`
 
 
-By uploading a local `.pr_agent.toml` file to the root of the repo's main branch, you can edit and customize any configuration parameter. Note that you need to upload `.pr_agent.toml` prior to creating a PR, in order for the configuration to take effect.
+By uploading a local `.pr_agent.toml` file to the root of the repo's default branch, you can edit and customize any configuration parameter. Note that you need to upload `.pr_agent.toml` prior to creating a PR, in order for the configuration to take effect.
 
 For example, if you set in `.pr_agent.toml`:
 
@@ -61,7 +61,7 @@ Then you can give a list of extra instructions to the `review` tool.
 
 `Platforms supported: GitHub, GitLab, Bitbucket`
 
-If you create a repo called `pr-agent-settings` in your **organization**, it's configuration file `.pr_agent.toml` will be used as a global configuration file for any other repo that belongs to the same organization.
+If you create a repo called `pr-agent-settings` in your **organization**, its configuration file `.pr_agent.toml` will be used as a global configuration file for any other repo that belongs to the same organization.
 Parameters from a local `.pr_agent.toml` file, in a specific repo, will override the global configuration parameters.
 
 For example, in the GitHub organization `Codium-ai`:
@@ -69,3 +69,29 @@ For example, in the GitHub organization `Codium-ai`:
 - The file [`https://github.com/Codium-ai/pr-agent-settings/.pr_agent.toml`](https://github.com/Codium-ai/pr-agent-settings/blob/main/.pr_agent.toml)  serves as a global configuration file for all the repos in the GitHub organization `Codium-ai`.
 
 - The repo [`https://github.com/Codium-ai/pr-agent`](https://github.com/Codium-ai/pr-agent/blob/main/.pr_agent.toml) inherits the global configuration file from `pr-agent-settings`.
+
+### Bitbucket Organization level configuration file 💎
+`Relevant platforms: Bitbucket Data Center`
+
+In Bitbucket Data Center, there are two levels where you can define a global configuration file:
+
+* Project-level global configuration:
+
+Create a repository named `pr-agent-settings` within a specific project. The configuration file in this repository will apply to all repositories under the same project.
+
+* Organization-level global configuration:
+
+Create a dedicated project to hold a global configuration file that affects all repositories across all projects in your organization.
+
+**Setting up organization-level global configuration:**
+
+1.	Create a new project with both the name and key: PR_AGENT_SETTINGS.
+2.	Inside the PR_AGENT_SETTINGS project, create a repository named pr-agent-settings.
+3.	In this repository, add a `.pr_agent.toml` configuration file—structured similarly to the global configuration file described above.
+4.	Optionally, you can add organizational-level [global best practices file](https://qodo-merge-docs.qodo.ai/usage-guide/configuration_options/#global-configuration-file).
+
+Repositories across your entire Bitbucket organization will inherit the configuration from this file.
+
+!!! note "Note"
+    If both organization-level and project-level global settings are defined, the project-level settings will take precedence over the organization-level configuration. Additionally, parameters from a repository’s local .pr_agent.toml file will always override both global settings.
+

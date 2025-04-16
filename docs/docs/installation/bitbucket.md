@@ -1,7 +1,7 @@
 ## Run as a Bitbucket Pipeline
 
 
-You can use the Bitbucket Pipeline system to run Qodo Merge on every pull request open or update.
+You can use the Bitbucket Pipeline system to run PR-Agent on every pull request open or update.
 
 1. Add the following file in your repository bitbucket-pipelines.yml
 
@@ -11,7 +11,7 @@ pipelines:
       '**':
         - step:
             name: PR Agent Review
-            image: python:3.10
+            image: python:3.12
             services:
               - docker
             script:
@@ -54,7 +54,7 @@ python cli.py --pr_url https://git.onpreminstanceofbitbucket.com/projects/PROJEC
 
 ### Run it as service
 
-To run Qodo Merge as webhook, build the docker image:
+To run PR-Agent as webhook, build the docker image:
 ```
 docker build . -t codiumai/pr-agent:bitbucket_server_webhook --target bitbucket_server_webhook -f docker/Dockerfile
 docker push codiumai/pr-agent:bitbucket_server_webhook  # Push to your Docker repository

@@ -7,7 +7,8 @@ from github import RateLimitExceededException
 
 from pr_agent.algo.file_filter import filter_ignored
 from pr_agent.algo.git_patch_processing import (
-    convert_to_hunks_with_lines_numbers, extend_patch, handle_patch_deletions)
+    extend_patch, handle_patch_deletions,
+    decouple_and_convert_to_hunks_with_lines_numbers)
 from pr_agent.algo.language_handler import sort_files_by_main_languages
 from pr_agent.algo.token_handler import TokenHandler
 from pr_agent.algo.types import EDIT_TYPE, FilePatchInfo
@@ -50,21 +51,10 @@ def get_pr_diff(git_provider: GitProvider, token_handler: TokenHandler,
         PATCH_EXTRA_LINES_AFTER = cap_and_log_extra_lines(PATCH_EXTRA_LINES_AFTER, "after")
 
     try:
-        diff_files_original = git_provider.get_diff_files()
+        diff_files = git_provider.get_diff_files()
     except RateLimitExceededException as e:
         get_logger().error(f"Rate limit exceeded for git provider API. original message {e}")
         raise
-
-    diff_files = filter_ignored(diff_files_original)
-    if diff_files != diff_files_original:
-        try:
-            get_logger().info(f"Filtered out {len(diff_files_original) - len(diff_files)} files")
-            new_names = set([a.filename for a in diff_files])
-            orig_names = set([a.filename for a in diff_files_original])
-            get_logger().info(f"Filtered out files: {orig_names - new_names}")
-        except Exception as e:
-            pass
-
 
     # get pr languages
     pr_languages = sort_files_by_main_languages(git_provider.get_languages(), diff_files)
@@ -155,20 +145,10 @@ def get_pr_diff(git_provider: GitProvider, token_handler: TokenHandler,
 def get_pr_diff_multiple_patchs(git_provider: GitProvider, token_handler: TokenHandler, model: str,
                 add_line_numbers_to_hunks: bool = False, disable_extra_lines: bool = False):
     try:
-        diff_files_original = git_provider.get_diff_files()
+        diff_files = git_provider.get_diff_files()
     except RateLimitExceededException as e:
         get_logger().error(f"Rate limit exceeded for git provider API. original message {e}")
         raise
-
-    diff_files = filter_ignored(diff_files_original)
-    if diff_files != diff_files_original:
-        try:
-            get_logger().info(f"Filtered out {len(diff_files_original) - len(diff_files)} files")
-            new_names = set([a.filename for a in diff_files])
-            orig_names = set([a.filename for a in diff_files_original])
-            get_logger().info(f"Filtered out files: {orig_names - new_names}")
-        except Exception as e:
-            pass
 
     # get pr languages
     pr_languages = sort_files_by_main_languages(git_provider.get_languages(), diff_files)
@@ -195,24 +175,27 @@ def pr_generate_extended_diff(pr_languages: list,
     for lang in pr_languages:
         for file in lang['files']:
             original_file_content_str = file.base_file
+            new_file_content_str = file.head_file
             patch = file.patch
             if not patch:
                 continue
 
             # extend each patch with extra lines of context
             extended_patch = extend_patch(original_file_content_str, patch,
-                                          patch_extra_lines_before, patch_extra_lines_after, file.filename)
+                                          patch_extra_lines_before, patch_extra_lines_after, file.filename,
+                                          new_file_str=new_file_content_str)
             if not extended_patch:
                 get_logger().warning(f"Failed to extend patch for file: {file.filename}")
                 continue
 
             if add_line_numbers_to_hunks:
-                full_extended_patch = convert_to_hunks_with_lines_numbers(extended_patch, file)
+                full_extended_patch = decouple_and_convert_to_hunks_with_lines_numbers(extended_patch, file)
             else:
-                full_extended_patch = f"\n\n## File: '{file.filename.strip()}'\n{extended_patch.rstrip()}\n"
+                extended_patch = extended_patch.replace('\n@@ ', '\n\n@@ ') # add extra line before each hunk
+                full_extended_patch = f"\n\n## File: '{file.filename.strip()}'\n\n{extended_patch.strip()}\n"
 
             # add AI-summary metadata to the patch
-            if file.ai_file_summary and  get_settings().get("config.enable_ai_metadata", False):
+            if file.ai_file_summary and get_settings().get("config.enable_ai_metadata", False):
                 full_extended_patch = add_ai_summary_top_patch(file, full_extended_patch)
 
             patch_tokens = token_handler.count_tokens(full_extended_patch)
@@ -252,7 +235,7 @@ def pr_generate_compressed_diff(top_langs: list, token_handler: TokenHandler, mo
             continue
 
         if convert_hunks_to_line_numbers:
-            patch = convert_to_hunks_with_lines_numbers(patch, file)
+            patch = decouple_and_convert_to_hunks_with_lines_numbers(patch, file)
 
         ## add AI-summary metadata to the patch (disabled, since we are in the compressed diff)
         # if file.ai_file_summary and get_settings().config.get('config.is_auto_command', False):
@@ -384,7 +367,8 @@ def _get_all_deployments(all_models: List[str]) -> List[str]:
 def get_pr_multi_diffs(git_provider: GitProvider,
                        token_handler: TokenHandler,
                        model: str,
-                       max_calls: int = 5) -> List[str]:
+                       max_calls: int = 5,
+                       add_line_numbers: bool = True) -> List[str]:
     """
     Retrieves the diff files from a Git provider, sorts them by main language, and generates patches for each file.
     The patches are split into multiple groups based on the maximum number of tokens allowed for the given model.
@@ -407,8 +391,6 @@ def get_pr_multi_diffs(git_provider: GitProvider,
         get_logger().error(f"Rate limit exceeded for git provider API. original message {e}")
         raise
 
-    diff_files = filter_ignored(diff_files)
-
     # Sort files by main language
     pr_languages = sort_files_by_main_languages(git_provider.get_languages(), diff_files)
 
@@ -425,7 +407,8 @@ def get_pr_multi_diffs(git_provider: GitProvider,
 
     # try first a single run with standard diff string, with patch extension, and no deletions
     patches_extended, total_tokens, patches_extended_tokens = pr_generate_extended_diff(
-        pr_languages, token_handler, add_line_numbers_to_hunks=True,
+        pr_languages, token_handler,
+        add_line_numbers_to_hunks=add_line_numbers,
         patch_extra_lines_before=PATCH_EXTRA_LINES_BEFORE,
         patch_extra_lines_after=PATCH_EXTRA_LINES_AFTER)
 
@@ -454,7 +437,12 @@ def get_pr_multi_diffs(git_provider: GitProvider,
         if patch is None:
             continue
 
-        patch = convert_to_hunks_with_lines_numbers(patch, file)
+        # Add line numbers and metadata to the patch
+        if add_line_numbers:
+            patch = decouple_and_convert_to_hunks_with_lines_numbers(patch, file)
+        else:
+            patch = f"\n\n## File: '{file.filename.strip()}'\n\n{patch.strip()}\n"
+
         # add AI-summary metadata to the patch
         if file.ai_file_summary and get_settings().get("config.enable_ai_metadata", False):
             patch = add_ai_summary_top_patch(file, patch)
@@ -502,7 +490,7 @@ def get_pr_multi_diffs(git_provider: GitProvider,
     # Add the last chunk
     if patches:
         final_diff = "\n".join(patches)
-        final_diff_list.append(final_diff)
+        final_diff_list.append(final_diff.strip())
 
     return final_diff_list
 

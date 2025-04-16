@@ -22,6 +22,7 @@ def set_parser():
     - cli.py --pr_url=... ask "write me a poem about this PR"
     - cli.py --pr_url=... reflect
     - cli.py --issue_url=... similar_issue
+    - cli.py --pr_url/--issue_url= help_docs [<asked question>]
 
     Supported commands:
     - review / review_pr - Add a review that includes a summary of the PR and specific suggestions for improvement.
@@ -40,6 +41,8 @@ def set_parser():
     - add_docs
 
     - generate_labels
+    
+    - help_docs - Ask a question, from either an issue or PR context, on a given repo (current context or a different one)
 
 
     Configuration:
