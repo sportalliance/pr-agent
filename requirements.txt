@@ -12,7 +12,7 @@ GitPython==3.1.41
 google-cloud-aiplatform==1.38.0
 google-generativeai==0.8.3
 google-cloud-storage==2.10.0
-Jinja2==3.1.2
+Jinja2==3.1.6
 litellm==1.66.1
 loguru==0.7.2
 msrest==0.7.1
